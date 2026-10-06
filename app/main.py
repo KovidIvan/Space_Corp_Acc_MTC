@@ -52,6 +52,7 @@ def create_app(runtime_settings: Settings = settings) -> FastAPI:
         config.router,
         wizard.router,
         auth.router,
+        wizard.web_router,
         stats.router,
         audit.router,
         ws.router,

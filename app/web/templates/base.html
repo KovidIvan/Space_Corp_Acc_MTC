@@ -12,6 +12,7 @@
         <a class="brand" href="/calls">Space Corp <span>Ассистент звонков</span></a>
         {% if owner %}
         <div class="account">
+            <a class="account-link" href="/setup">Настройки</a>
             <span>{{ owner.name }}</span>
             <form action="/api/auth/logout" method="post">
                 <button class="button button-quiet" type="submit">Выйти</button>

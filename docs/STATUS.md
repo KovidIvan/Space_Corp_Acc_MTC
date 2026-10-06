@@ -1,20 +1,21 @@
 # STATUS (update at the end of every work session)
 
-Last sync: Dev B B2 dashboard implemented and validated (2026-10-06)
+Last sync: Dev B B3 wizard/config/consent implemented and validated (2026-10-06)
 
 ## Current implementation snapshot
 - Dev B B2 adds a Russian Jinja2 dashboard, signed owner login, call filters/detail, locally vendored HTMX, and five synthetic encrypted demo calls.
+- Dev B B3 adds a five-step setup wizard with persisted duration, AgentConfig GET/POST/PUT and audited current-version rollback, HMAC-hashed VIP numbers, consent capture/versioning, and a consent/config guard on `/ws/call`.
 - Dashboard bootstrap settings are documented in `.env.example`; the owner account is created only when dashboard settings are complete and is not overwritten on later starts.
-- `python -m pytest -q`: 33 passed (one upstream Starlette/httpx deprecation warning); `python -m ruff check app tests`: passed.
+- `python -m compileall -q app tests` passed; `python -m pytest -q`: 36 passed (one upstream Starlette/httpx deprecation warning); `python -m ruff check app tests`: passed.
 - `git diff --check`: passed after normalizing line endings. `make` remains unavailable in this PowerShell environment.
-- Dashboard workflows are implemented; remaining B3-B8 workflows are not implemented. FR-09 remains unchecked because call editing is pending B6.
+- FR-11 remains open: Telegram linking awaits B4, and an actual test call awaits Dev A's voice pipeline. FR-09 remains unchecked because call editing is pending B6.
 
 ## Task board
 Dev A: [ ] A1 bench  [ ] A2 VAD+STT  [ ] A3 TTS+cache  [ ] A4 NLU+dialog  [ ] A5 WS session+caller page  [ ] A6 router+handoff+summary  [ ] A7 eval  [ ] A8 chat offer / extras
-Dev B: [x] B1 core+security  [x] B2 dashboard shell  [ ] B3 wizard+config+consent  [ ] B4 Telegram  [ ] B5 ingest+notify  [ ] B6 editing+audit  [ ] B7 editors  [ ] B8 stats+settings+offline test
+Dev B: [x] B1 core+security  [x] B2 dashboard shell  [x] B3 wizard+config+consent  [ ] B4 Telegram  [ ] B5 ingest+notify  [ ] B6 editing+audit  [ ] B7 editors  [ ] B8 stats+settings+offline test
 
 ## Requirements progress
-P0: FR-01 [ ] FR-02 [ ] FR-03 [ ] FR-04 [ ] FR-05 [ ] FR-06 [ ] FR-07 [ ] FR-08 [ ] FR-09 [ ] FR-10 [ ] FR-11 [ ] FR-12 [ ] FR-13 [ ] FR-14
+P0: FR-01 [ ] FR-02 [ ] FR-03 [ ] FR-04 [ ] FR-05 [ ] FR-06 [ ] FR-07 [ ] FR-08 [ ] FR-09 [ ] FR-10 [ ] FR-11 [ ] FR-12 [x] FR-13 [ ] FR-14 [ ]
 P1: FR-15 [ ] FR-16 [ ] FR-17 [ ] FR-18 [ ] FR-19 [ ] FR-20 [ ] FR-21
 P2: FR-22 [ ] FR-23 [ ] FR-24 [ ] FR-25 [ ] FR-26 [ ] FR-27
 
@@ -25,7 +26,9 @@ P2: FR-22 [ ] FR-23 [ ] FR-24 [ ] FR-25 [ ] FR-26 [ ] FR-27
 (format: from -> to: what is needed, why, date)
 - Dev B -> Dev A: Bootstrap added docstring-only stubs under `app/voice/` and `app/agent/` per user-approved exception; confirm handoff before feature implementation, 2026-10-06.
 - Dev B -> Dev A: `.env.example` now documents owner/session/encryption settings for B2; its five demo calls are synthetic and live in `app/core/demo_data.py` because `fixtures/` has no CallResult files, 2026-10-06.
+- Dev B -> Dev A: `/ws/call` now rejects starts without current consent; with consent it returns 1013 until the voice pipeline is implemented. Please connect the call workflow here when ready, 2026-10-06.
 
 ## Blocked / risks
 - The installed Starlette TestClient emits a deprecation warning about httpx; tests pass. `make` command itself is unavailable, so equivalent Python module commands were used.
 - Local `safe_http` guard denies automatic redirects; its mocked redirect test passes.
+- The caller page and voice WebSocket pipeline remain stubs; B3 only enforces consent at the call-start boundary. A real test-call is not yet available.
