@@ -2,13 +2,14 @@
 
 import logging
 
+import httpx
 import pytest
 from cryptography.fernet import Fernet, InvalidToken
 
 from app.core.audit import create_audit_event, verify_chain
 from app.core.config import Settings
 from app.core.logging import PiiMaskFilter, mask_pii
-from app.core.safe_http import is_allowed_url, validate_outbound_url
+from app.core.safe_http import SafeHttpClient, is_allowed_url, validate_outbound_url
 from app.core.security import decrypt_text, encrypt_text, hash_password, verify_password
 
 
@@ -60,6 +61,23 @@ def test_non_allowlisted_urls(url: str) -> None:
     assert not is_allowed_url(url)
     with pytest.raises(ValueError):
         validate_outbound_url(url)
+
+
+@pytest.mark.asyncio
+async def test_safe_http_client_does_not_follow_redirects_to_nonallowlisted_host() -> None:
+    requested_hosts: list[str] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        requested_hosts.append(request.url.host)
+        return httpx.Response(302, headers={"Location": "https://example.com/"}, request=request)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(respond), follow_redirects=True)
+    safe_client = SafeHttpClient(client)
+    response = await safe_client.request("GET", "http://localhost/start")
+    await safe_client.aclose()
+
+    assert response.status_code == 302
+    assert requested_hosts == ["localhost"]
 
 
 def test_fernet_text_round_trip_and_invalid_key() -> None:

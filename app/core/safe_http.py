@@ -43,6 +43,7 @@ class SafeHttpClient:
     async def request(self, method: str, url: str, **kwargs: object) -> httpx.Response:
         """Send an HTTP request only to an allowlisted URL."""
         validate_outbound_url(url)
+        kwargs["follow_redirects"] = False
         return await self._client.request(method, url, **kwargs)
 
     async def aclose(self) -> None:
