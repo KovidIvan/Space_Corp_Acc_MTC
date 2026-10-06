@@ -10,6 +10,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.api import audit, auth, calls, config, dashboard, stats, wizard, ws
+from app.channels.telegram import TelegramChannel
 from app.core import db as database
 from app.core.bootstrap import ensure_owner_account
 from app.core.config import Settings, settings
@@ -31,10 +32,24 @@ def create_app(runtime_settings: Settings = settings) -> FastAPI:
                 encryption_key = runtime_settings.data_encryption_key
                 if encryption_key is not None:
                     seed_demo_calls(db_session, encryption_key.get_secret_value())
-        yield
+            telegram_channel = application.state.telegram_channel
+            if telegram_channel is not None:
+                await telegram_channel.start()
+        try:
+            yield
+        finally:
+            telegram_channel = application.state.telegram_channel
+            if telegram_channel is not None and runtime_settings.dashboard_configured:
+                await telegram_channel.stop()
 
     application = FastAPI(title="Локальный помощник звонков", lifespan=lifespan)
     application.state.settings = runtime_settings
+    telegram_token = runtime_settings.telegram_bot_token
+    application.state.telegram_channel = (
+        TelegramChannel(telegram_token.get_secret_value(), session_factory=database.SessionLocal)
+        if telegram_token is not None and telegram_token.get_secret_value()
+        else None
+    )
     application.state.templates = Jinja2Templates(directory=TEMPLATES_DIR)
     application.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 

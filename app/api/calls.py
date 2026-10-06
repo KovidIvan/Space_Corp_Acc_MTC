@@ -1,20 +1,26 @@
 """Authenticated call-list and call-detail API endpoints."""
 
+import ipaddress
 import json
+import logging
 from typing import Annotated, Any
 
 from cryptography.fernet import InvalidToken
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_owner
 from app.core.audit import record_audit_event
 from app.core.db import get_db
-from app.core.security import decrypt_text
+from app.core.security import decrypt_text, encrypt_text
+from app.interfaces import Notice
 from app.models import CallRecord, Owner
+from app.schemas import CallResult
 
 router = APIRouter(prefix="/api/calls", tags=["calls"])
+LOGGER = logging.getLogger(__name__)
 
 
 def _call_query(
@@ -31,6 +37,107 @@ def _call_query(
     if handled is not None:
         query = query.where(CallRecord.handled.is_(handled))
     return list(db.scalars(query.order_by(CallRecord.started_at.desc()).limit(100)))
+
+
+def _require_loopback(request: Request) -> None:
+    """Reject CallResult ingestion from clients outside the local machine."""
+    client = request.client
+    try:
+        is_loopback = client is not None and ipaddress.ip_address(client.host).is_loopback
+    except ValueError:
+        is_loopback = False
+    if not is_loopback:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Local call pipeline required")
+
+
+@router.post("/ingest", status_code=status.HTTP_201_CREATED)
+async def ingest_call_result(
+    result: CallResult,
+    request: Request,
+    response: Response,
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, str | bool]:
+    """Persist a locally produced CallResult and avoid duplicate submissions."""
+    _require_loopback(request)
+    existing = db.get(CallRecord, result.call_id)
+    if existing is not None:
+        response.status_code = status.HTTP_200_OK
+        return {"call_id": existing.id, "created": False}
+
+    encryption_key = request.app.state.settings.data_encryption_key
+    if encryption_key is None or not encryption_key.get_secret_value():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Call storage encryption is not configured",
+        )
+
+    no_record = result.no_record
+    transcript_enc = None
+    summary_enc = None
+    slots_enc = None
+    if not no_record:
+        key = encryption_key.get_secret_value()
+        transcript_json = json.dumps(
+            [segment.model_dump(mode="json", exclude_none=True) for segment in result.transcript],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        slots_json = json.dumps(
+            result.slots.model_dump(mode="json"), ensure_ascii=False, separators=(",", ":")
+        )
+        transcript_enc = encrypt_text(transcript_json, key)
+        summary_enc = encrypt_text(result.summary_ru, key)
+        slots_enc = encrypt_text(slots_json, key)
+    elif result.slots.callback_number:
+        callback_request = json.dumps(
+            {"callback_number": result.slots.callback_number},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        slots_enc = encrypt_text(callback_request, encryption_key.get_secret_value())
+
+    call = CallRecord(
+        id=result.call_id,
+        started_at=result.started_at,
+        ended_at=result.ended_at,
+        caller_masked=result.caller.masked,
+        caller_hash=result.caller.hash,
+        status="completed",
+        intent=result.intent,
+        urgency=result.urgency,
+        action=result.action,
+        no_record=no_record,
+        transcript_enc=transcript_enc,
+        summary_enc=summary_enc,
+        slots_enc=slots_enc,
+    )
+    db.add(call)
+    record_audit_event(db, "call_pipeline", "call_ingest", result.call_id, {"no_record": no_record})
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = db.get(CallRecord, result.call_id)
+        if existing is None:
+            raise
+        response.status_code = status.HTTP_200_OK
+        return {"call_id": existing.id, "created": False}
+
+    telegram_channel = request.app.state.telegram_channel
+    if telegram_channel is not None:
+        try:
+            await telegram_channel.notify(
+                Notice(
+                    call_id=result.call_id,
+                    urgency=result.urgency,
+                    intent=result.intent,
+                    summary="",
+                    caller_masked=result.caller.masked,
+                )
+            )
+        except (RuntimeError, SQLAlchemyError):
+            LOGGER.warning("Call stored but Telegram notification failed")
+    return {"call_id": call.id, "created": True}
 
 
 @router.get("")

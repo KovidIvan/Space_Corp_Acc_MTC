@@ -11,11 +11,19 @@ from sqlalchemy.orm import Session
 
 from app.api.config import save_agent_config_version
 from app.api.dependencies import require_owner
+from app.channels.telegram import TelegramApiError, create_link_token
 from app.core.audit import record_audit_event
 from app.core.consent import OWNER_CONSENT_TEXT, OWNER_CONSENT_VERSION
 from app.core.db import get_db
-from app.models import AgentConfig as AgentConfigRecord
-from app.models import Consent, Owner, WizardRun
+from app.models import (
+    AgentConfig as AgentConfigRecord,
+)
+from app.models import (
+    Consent,
+    Owner,
+    TelegramLink,
+    WizardRun,
+)
 from app.schemas import AgentConfig
 
 router = APIRouter(prefix="/api/wizard", tags=["wizard"])
@@ -83,6 +91,8 @@ def setup_page(
             "wizard_seconds": _elapsed_seconds(run, datetime.now(UTC)),
             "consent_text": OWNER_CONSENT_TEXT,
             "consent_version": OWNER_CONSENT_VERSION,
+            "telegram_enabled": request.app.state.telegram_channel is not None,
+            "telegram_linked": db.scalar(select(TelegramLink.chat_id).limit(1)) is not None,
             "values": {
                 "owner_name": business_owner.get("name", owner.name),
                 "owner_company": business_owner.get("company", owner.company),
@@ -131,6 +141,51 @@ def setup_complete_page(
             "consent_text": OWNER_CONSENT_TEXT,
         },
     )
+
+
+@router.get("/telegram-link")
+def telegram_link_status(
+    request: Request,
+    owner: Annotated[Owner, Depends(require_owner)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, bool]:
+    """Return Telegram bot availability and whether an owner chat is linked."""
+    return {
+        "enabled": request.app.state.telegram_channel is not None,
+        "linked": db.scalar(select(TelegramLink.chat_id).limit(1)) is not None,
+    }
+
+
+@router.post("/telegram-link")
+async def create_telegram_link(
+    request: Request,
+    response: Response,
+    owner: Annotated[Owner, Depends(require_owner)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, str]:
+    """Issue a short-lived deep link that binds the owner's Telegram chat."""
+    channel = request.app.state.telegram_channel
+    if channel is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Telegram-бот не настроен. Укажите TELEGRAM_BOT_TOKEN в локальном .env.",
+        )
+    try:
+        username = await channel.bot_username()
+    except TelegramApiError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Не удалось подключиться к Telegram-боту.",
+        ) from None
+
+    token, expires_at = create_link_token(db, owner.id)
+    record_audit_event(db, owner.id, "telegram_link_token", "telegram", {"expires_in_seconds": 600})
+    db.commit()
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "url": f"https://t.me/{username}?start={token}",
+        "expires_at": expires_at.isoformat(),
+    }
 
 
 @router.post("/start")

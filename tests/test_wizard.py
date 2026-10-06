@@ -15,7 +15,7 @@ from app.core.config import Settings
 from app.core.consent import OWNER_CONSENT_VERSION, has_current_owner_consent
 from app.main import create_app
 from app.models import AgentConfig as AgentConfigRecord
-from app.models import AuditEvent, Consent, WizardRun
+from app.models import AuditEvent, Consent, TelegramLinkToken, WizardRun
 
 
 @pytest.fixture
@@ -91,6 +91,37 @@ def test_setup_requires_login_and_renders_five_steps(wizard_client: TestClient) 
         assert len(runs) == 1
         assert runs[0].finished_at is None
         assert runs[0].seconds is None
+
+
+def test_telegram_link_requires_login_and_issues_short_lived_deep_link(wizard_client: TestClient) -> None:
+    assert wizard_client.get("/api/wizard/telegram-link").status_code == 401
+    _login(wizard_client)
+
+    class TelegramFake:
+        async def bot_username(self) -> str:
+            return "synthetic_bot"
+
+        async def start(self) -> None:
+            pass
+
+        async def stop(self) -> None:
+            pass
+
+    wizard_client.app.state.telegram_channel = TelegramFake()
+    response = wizard_client.post("/api/wizard/telegram-link")
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    result = response.json()
+    assert result["url"].startswith("https://t.me/synthetic_bot?start=")
+    raw_token = result["url"].split("start=", 1)[1]
+    assert len(raw_token) <= 64
+    assert wizard_client.get("/api/wizard/telegram-link").json() == {"enabled": True, "linked": False}
+
+    with database.SessionLocal() as db_session:
+        token_rows = list(db_session.scalars(select(TelegramLinkToken)))
+        assert len(token_rows) == 1
+        assert token_rows[0].token_hash != raw_token
 
 
 def test_websocket_call_is_rejected_without_current_consent(wizard_client: TestClient) -> None:
