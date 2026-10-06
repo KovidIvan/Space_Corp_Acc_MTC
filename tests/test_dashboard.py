@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 from app.core import db as database
 from app.core.config import Settings
 from app.core.demo_data import seed_demo_calls
+from app.core.security import decrypt_text
 from app.main import create_app
 from app.models import AuditEvent, CallRecord
 
@@ -44,6 +45,66 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
 def test_dashboard_requires_login_and_local_htmx_is_served(client: TestClient) -> None:
     assert client.get("/calls", follow_redirects=False).status_code == 303
     assert client.get("/api/calls").status_code == 401
+
+
+def test_call_edit_encrypts_changes_and_audits_only_field_names(client: TestClient) -> None:
+    login = client.post(
+        "/api/auth/login",
+        data={"username": "dashboard-owner", "password": "test-only-password"},
+        follow_redirects=False,
+    )
+    assert login.status_code == 303
+
+    payload = {
+        "summary": "Исправленное синтетическое резюме",
+        "intent": "partner",
+        "urgency": "normal",
+        "action": "offer_chat",
+        "transcript": [
+            {
+                "who": "caller",
+                "text": "Исправленный синтетический текст",
+                "words": [{"w": "Исправленный", "p": 0.99}],
+            }
+        ],
+    }
+    response = client.patch("/api/calls/demo-call-1", json=payload)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": "demo-call-1",
+        "edited": True,
+        "fields": ["action", "intent", "summary", "transcript", "urgency"],
+    }
+    key = client.app.state.settings.data_encryption_key.get_secret_value()
+    with database.SessionLocal() as db_session:
+        call = db_session.get(CallRecord, "demo-call-1")
+        event = db_session.scalar(select(AuditEvent).where(AuditEvent.action == "edit"))
+        assert call is not None and call.edited
+        assert call.intent == "partner" and call.urgency == "normal" and call.action == "offer_chat"
+        assert call.summary_enc is not None and "Исправленное синтетическое резюме" not in call.summary_enc
+        assert "Исправленное синтетическое резюме" in decrypt_text(call.summary_enc, key)
+        assert call.transcript_enc is not None and "Исправленный синтетический текст" not in call.transcript_enc
+        assert event is not None
+        assert event.details == {"fields": ["action", "intent", "summary", "transcript", "urgency"]}
+        assert "Исправленное" not in str(event.details)
+
+    detail = client.get("/calls/demo-call-1")
+    assert "Изменён" in detail.text
+    assert "Редактирование звонка" in detail.text
+    assert "Исправленный синтетический текст" in detail.text
+
+
+def test_call_edit_requires_owner_and_rejects_invalid_payload(client: TestClient) -> None:
+    assert client.patch("/api/calls/demo-call-1", json={"summary": "No access"}).status_code == 401
+    client.post(
+        "/api/auth/login",
+        data={"username": "dashboard-owner", "password": "test-only-password"},
+        follow_redirects=False,
+    )
+
+    assert client.patch("/api/calls/demo-call-1", json={"unknown": "field"}).status_code == 422
+    assert client.patch("/api/calls/missing", json={"summary": "Missing"}).status_code == 404
 
     asset = client.get("/static/vendor/htmx.min.js")
     assert asset.status_code == 200

@@ -108,6 +108,23 @@ def test_no_record_ingest_keeps_metadata_and_only_encrypted_callback_request(
         assert call.caller_hash == "synthetic-hmac"
         assert call.transcript_enc is None
         assert call.summary_enc is None
+
+
+def test_no_record_call_cannot_be_edited(ingest_client: TestClient) -> None:
+    response = ingest_client.post("/api/calls/ingest", json=_call_result("no-record-edit", no_record=True))
+    assert response.status_code == 201
+
+    ingest_client.post(
+        "/api/auth/login",
+        data={"username": "ingest-owner", "password": "test-only-password"},
+        follow_redirects=False,
+    )
+    edit_response = ingest_client.patch("/api/calls/no-record-edit", json={"summary": "Do not save"})
+
+    assert edit_response.status_code == 409
+    with database.SessionLocal() as db:
+        call = db.get(CallRecord, "no-record-edit")
+        assert call is not None and call.no_record and call.summary_enc is None
         assert call.slots_enc is not None
         assert "+375291234567" not in call.slots_enc
         stored_slots = json.loads(
