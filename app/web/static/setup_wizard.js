@@ -10,9 +10,13 @@ if (form) {
 	const progress = document.getElementById("wizard-progress");
 	const timer = document.getElementById("wizard-timer");
 	const message = document.getElementById("wizard-message");
+	const telegramLinkButton = document.getElementById("telegram-link-button");
+	const telegramLinkUrl = document.getElementById("telegram-link-url");
+	const telegramLinkStatus = document.getElementById("telegram-link-status");
 	const initialSeconds = Number(form.dataset.elapsed || 0);
 	const timerStartedAt = Date.now();
 	let currentStep = 0;
+	let telegramLinkPoll;
 
 	const elapsedSeconds = () => initialSeconds + Math.floor((Date.now() - timerStartedAt) / 1000);
 	const renderTimer = () => {
@@ -29,6 +33,26 @@ if (form) {
 		nextButton.hidden = index === steps.length - 1;
 		finishButton.hidden = index !== steps.length - 1;
 		message.hidden = true;
+		if (telegramLinkPoll) window.clearInterval(telegramLinkPoll);
+		if (index === 3 && telegramLinkStatus && !telegramLinkButton.hidden) {
+			telegramLinkPoll = window.setInterval(refreshTelegramLinkStatus, 3000);
+		}
+	}
+
+	async function refreshTelegramLinkStatus() {
+		try {
+			const response = await fetch("/api/wizard/telegram-link", { cache: "no-store" });
+			if (!response.ok) return;
+			const result = await response.json();
+			telegramLinkStatus.textContent = result.linked ? "Telegram подключён." : "Telegram пока не подключён.";
+			if (result.linked) {
+				telegramLinkButton.hidden = true;
+				telegramLinkUrl.hidden = true;
+				window.clearInterval(telegramLinkPoll);
+			}
+		} catch {
+			telegramLinkStatus.textContent = "Не удалось проверить состояние Telegram.";
+		}
 	}
 
 	function validateCurrentStep() {
@@ -86,6 +110,24 @@ if (form) {
 		if (validateCurrentStep()) showStep(Math.min(currentStep + 1, steps.length - 1));
 	});
 	backButton.addEventListener("click", () => showStep(Math.max(currentStep - 1, 0)));
+	if (telegramLinkButton) {
+		telegramLinkButton.addEventListener("click", async () => {
+			telegramLinkButton.disabled = true;
+			telegramLinkStatus.textContent = "Создаём защищённую ссылку…";
+			try {
+				const response = await fetch("/api/wizard/telegram-link", { method: "POST", cache: "no-store" });
+				const result = await response.json();
+				if (!response.ok) throw new Error();
+				telegramLinkUrl.href = result.url;
+				telegramLinkUrl.hidden = false;
+				telegramLinkStatus.textContent = "Ссылка создана и действует 10 минут.";
+			} catch {
+				telegramLinkStatus.textContent = "Не удалось создать ссылку. Проверьте настройки Telegram и повторите попытку.";
+			} finally {
+				telegramLinkButton.disabled = false;
+			}
+		});
+	}
 	form.addEventListener("submit", async (event) => {
 		event.preventDefault();
 		if (!validateCurrentStep()) return;

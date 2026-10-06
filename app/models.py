@@ -97,6 +97,18 @@ class TelegramLink(Base):
     linked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now, nullable=False)
 
 
+class TelegramLinkToken(Base):
+    """Single-use token authorizing one Telegram owner-chat link."""
+
+    __tablename__ = "telegram_link_token"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("owner.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class ChatThread(Base):
     """Encrypted text relay associated with a call."""
 

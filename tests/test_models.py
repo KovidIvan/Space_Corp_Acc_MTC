@@ -17,6 +17,7 @@ def test_all_architecture_tables_are_registered() -> None:
         "call",
         "audit_event",
         "telegram_link",
+        "telegram_link_token",
         "chat_thread",
         "wizard_run",
     }

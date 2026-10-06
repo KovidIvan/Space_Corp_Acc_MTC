@@ -74,10 +74,14 @@
         <section class="wizard-step" data-step="4" hidden>
             <p class="eyebrow">Telegram</p>
             <h2>Подключение уведомлений</h2>
-            <div class="notice">
-                Привязка Telegram через защищённую ссылку будет доступна на следующем этапе B4. Сейчас можно продолжить настройку; уведомления начнут работать после привязки.
-            </div>
-            <p class="muted">Не вводите здесь токен бота или код доступа.</p>
+            {% if telegram_enabled %}
+            <div id="telegram-link-status" class="notice" role="status">{% if telegram_linked %}Telegram подключён.{% else %}Telegram пока не подключён.{% endif %}</div>
+            <button id="telegram-link-button" class="button button-secondary" type="button" {% if telegram_linked %}hidden{% endif %}>Создать ссылку для подключения</button>
+            <a id="telegram-link-url" class="button button-secondary" href="#" target="_blank" rel="noopener noreferrer" hidden>Открыть Telegram-бота</a>
+            {% else %}
+            <div class="notice">Telegram-бот не настроен. Для подключения укажите TELEGRAM_BOT_TOKEN в локальном файле .env и перезапустите приложение.</div>
+            {% endif %}
+            <p class="muted">Ссылка одноразовая и действует 10 минут. Не пересылайте её другим людям.</p>
         </section>
         <section class="wizard-step" data-step="5" hidden>
             <p class="eyebrow">Согласие и проверка</p>
