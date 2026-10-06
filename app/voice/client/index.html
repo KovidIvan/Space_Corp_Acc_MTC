@@ -1,5 +1,254 @@
 <!doctype html>
 <html lang="ru">
-<head><meta charset="utf-8"><title>Звонок</title></head>
-<body><main></main></body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Симулятор звонящего | ИИ-ассистент</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --agent-bubble: #1e3a8a;
+      --caller-bubble: #334155;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+    .container {
+      width: 100%;
+      max-width: 640px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 0.5rem;
+    }
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    header p {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .input-group label {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .input-group input {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.625rem 0.875rem;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+    }
+    .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    button {
+      flex: 1;
+      padding: 0.625rem 1rem;
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: background 0.15s ease, opacity 0.15s ease;
+    }
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .btn-call { background: var(--success); color: #fff; }
+    .btn-call:hover:not(:disabled) { background: #15803d; }
+    .btn-hangup { background: var(--danger); color: #fff; }
+    .btn-hangup:hover:not(:disabled) { background: #b91c1c; }
+    .btn-test { background: var(--primary); color: #fff; }
+    .btn-test:hover:not(:disabled) { background: var(--primary-hover); }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0.75rem;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      font-size: 0.8125rem;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-weight: 600;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #64748b;
+    }
+    .status-dot.active { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    .status-dot.speaking { background: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
+
+    .transcript-box {
+      min-height: 280px;
+      max-height: 420px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 0.5rem;
+    }
+    .msg {
+      max-width: 85%;
+      padding: 0.625rem 0.875rem;
+      border-radius: 0.75rem;
+      font-size: 0.9375rem;
+      line-height: 1.4;
+    }
+    .msg-agent {
+      align-self: flex-start;
+      background: var(--agent-bubble);
+      color: #e0e7ff;
+      border-bottom-left-radius: 0.125rem;
+    }
+    .msg-caller {
+      align-self: flex-end;
+      background: var(--caller-bubble);
+      color: #f1f5f9;
+      border-bottom-right-radius: 0.125rem;
+    }
+    .msg-meta {
+      font-size: 0.6875rem;
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 0.25rem;
+      font-weight: 600;
+    }
+
+    .alert {
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .alert-warning { background: rgba(217, 119, 6, 0.2); border: 1px solid var(--warning); color: #fde68a; }
+    .alert-info { background: rgba(37, 99, 235, 0.2); border: 1px solid var(--primary); color: #bfdbfe; }
+    .alert.show { display: flex; }
+
+    footer {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    footer a { color: var(--primary); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📞 Симулятор входящего звонка</h1>
+      <p>Локальный голосовой интерфейс ИИ-ассистента (Web Audio PCM16 16 kHz)</p>
+    </header>
+
+    <div class="card controls">
+      <div class="input-group">
+        <label for="caller-number">Номер телефона звонящего</label>
+        <input type="tel" id="caller-number" value="+375 29 123-45-67" placeholder="+375...">
+      </div>
+
+      <div class="btn-row">
+        <button id="btn-call" class="btn-call">
+          <span>🟢</span> Позвонить
+        </button>
+        <button id="btn-hangup" class="btn-hangup" disabled>
+          <span>🔴</span> Завершить
+        </button>
+        <button id="btn-test" class="btn-test" disabled title="Отправить тестовую реплику сценария S1">
+          <span>🧪</span> Тест S1 (Срочный клиент)
+        </button>
+      </div>
+
+      <div class="status-bar">
+        <div class="status-badge">
+          <span id="conn-dot" class="status-dot"></span>
+          <span id="conn-status">Готов к звонку</span>
+        </div>
+        <div id="state-badge" style="color: var(--text-muted);">Состояние: Ожидание</div>
+      </div>
+
+      <div id="alert-handoff" class="alert alert-warning">
+        <span>⚠️</span> <span id="handoff-text">Переключение на руководителя...</span>
+      </div>
+
+      <div id="alert-chatoffer" class="alert alert-info">
+        <span>💬</span> <span id="chatoffer-text">Предложена ссылка на чат в Telegram.</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 0.5rem; font-weight: 600;">
+        Стенограмма диалога в реальном времени
+      </div>
+      <div id="transcript" class="transcript-box">
+        <div style="color: var(--text-muted); font-size: 0.875rem; text-align: center; margin-top: 5rem;">
+          Нажмите «Позвонить», чтобы начать разговор с ИИ-ассистентом
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <p><a href="/calls">← Вернуться в панель управления звонками</a></p>
+    </footer>
+  </div>
+
+  <script src="/voice/client/caller.js"></script>
+</body>
 </html>

@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -19,6 +20,7 @@ from app.core.demo_data import seed_demo_calls
 WEB_DIR = Path(__file__).parent / "web"
 TEMPLATES_DIR = WEB_DIR / "templates"
 STATIC_DIR = WEB_DIR / "static"
+VOICE_CLIENT_DIR = Path(__file__).parent / "voice" / "client"
 
 def create_app(runtime_settings: Settings = settings) -> FastAPI:
     """Create the dashboard application with local-only account bootstrap."""
@@ -52,6 +54,7 @@ def create_app(runtime_settings: Settings = settings) -> FastAPI:
     )
     application.state.templates = Jinja2Templates(directory=TEMPLATES_DIR)
     application.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    application.mount("/voice/client", StaticFiles(directory=VOICE_CLIENT_DIR), name="voice_client")
 
     if runtime_settings.session_secret and runtime_settings.session_secret.get_secret_value():
         application.add_middleware(
@@ -73,6 +76,12 @@ def create_app(runtime_settings: Settings = settings) -> FastAPI:
         ws.router,
     ):
         application.include_router(api_router)
+
+    @application.get("/call", response_class=HTMLResponse, include_in_schema=False)
+    async def caller_page() -> HTMLResponse:
+        """Render the browser caller simulator page."""
+        index_file = VOICE_CLIENT_DIR / "index.html"
+        return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
 
     @application.get("/health")
     async def health() -> dict[str, str]:
