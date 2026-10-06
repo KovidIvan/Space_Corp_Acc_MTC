@@ -1,0 +1,21 @@
+{% if calls %}
+<div class="table-wrap">
+    <table>
+        <thead><tr><th>Время</th><th>Номер</th><th>Тип</th><th>Срочность</th><th>Статус</th><th></th></tr></thead>
+        <tbody>
+        {% for call in calls %}
+            <tr>
+                <td>{{ call.started_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                <td>{{ call.caller_masked or 'Не определён' }}</td>
+                <td>{{ intent_labels.get(call.intent, 'Не определён') }}</td>
+                <td><span class="badge urgency-{{ call.urgency or 'unknown' }}">{{ urgency_labels.get(call.urgency, 'Не определена') }}</span></td>
+                <td>{{ 'Обработан' if call.handled else 'Новый' }}</td>
+                <td><a class="text-link" href="/calls/{{ call.id }}">Открыть</a></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state"><strong>Звонков пока нет</strong><span>Новые обращения появятся здесь после обработки.</span></div>
+{% endif %}

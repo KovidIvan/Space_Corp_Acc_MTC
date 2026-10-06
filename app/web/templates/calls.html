@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Звонки{% endblock %}
+{% block content %}
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Панель владельца</p>
+        <h1>Звонки</h1>
+        <p class="muted">Локально сохранённые обращения и результаты обработки.</p>
+    </div>
+    <div class="count-card"><strong>{{ call_count }}</strong><span>звонков</span></div>
+</section>
+<section class="panel filters-panel">
+    <form class="filters" action="/calls" method="get" hx-get="/calls/rows" hx-target="#call-list" hx-trigger="change">
+        <label>Срочность
+            <select name="urgency">
+                <option value="">Любая</option>
+                <option value="high" {% if urgency == 'high' %}selected{% endif %}>Высокая</option>
+                <option value="normal" {% if urgency == 'normal' %}selected{% endif %}>Обычная</option>
+                <option value="low" {% if urgency == 'low' %}selected{% endif %}>Низкая</option>
+            </select>
+        </label>
+        <label>Тип обращения
+            <select name="intent">
+                <option value="">Любой</option>
+                <option value="client" {% if intent == 'client' %}selected{% endif %}>Клиент</option>
+                <option value="partner" {% if intent == 'partner' %}selected{% endif %}>Партнёр</option>
+                <option value="vendor_sales" {% if intent == 'vendor_sales' %}selected{% endif %}>Продажи</option>
+                <option value="spam" {% if intent == 'spam' %}selected{% endif %}>Спам</option>
+                <option value="job_candidate" {% if intent == 'job_candidate' %}selected{% endif %}>Кандидат</option>
+                <option value="other" {% if intent == 'other' %}selected{% endif %}>Другое</option>
+                <option value="unclear" {% if intent == 'unclear' %}selected{% endif %}>Не определено</option>
+            </select>
+        </label>
+        <label>Статус
+            <select name="handled">
+                <option value="" {% if handled == '' %}selected{% endif %}>Любой</option>
+                <option value="false" {% if handled == 'false' %}selected{% endif %}>Не обработан</option>
+                <option value="true" {% if handled == 'true' %}selected{% endif %}>Обработан</option>
+            </select>
+        </label>
+        <noscript><button class="button button-secondary" type="submit">Применить фильтры</button></noscript>
+    </form>
+</section>
+<section class="panel table-panel" aria-label="Список звонков">
+    <div id="call-list">
+        {% include "call_rows.html" %}
+    </div>
+</section>
+{% endblock %}
