@@ -32,6 +32,7 @@ Today's tasks, in order (see docs/WORK_PLAN.md for details and docs/REQUIREMENTS
 1. A1: write scripts/bench.py that measures, on this machine, faster-whisper (small, medium), the configured Ollama model (JSON output time for a typical NLU prompt), and the TTS options (time to first audio for a 10-word phrase). Print a table and recommend PROFILE. Run only with synthetic text and audio.
 2. A2: app/voice/vad.py and stt.py: silero-vad endpointing (about 700 ms silence), faster-whisper transcription per utterance with word probabilities, a Transcript type; test with wav files from fixtures/.
 3. A3: app/voice/tts.py and phrases_cache.py: TTS behind the interface, 16 kHz PCM16 output, pre-rendered cache for greeting, disclosure and fixed phrases.
+4. Create `scripts/download_models.py`, called by `make setup-voice`, to download the `PROFILE`-selected Whisper, TTS, and other required voice model assets into `models/` for offline use after setup. Downloads must happen only when this setup command is explicitly run; runtime inference stays local.
 Keep every component behind the interfaces in app/interfaces.py and cover pure logic with unit tests. Do not change contracts/. Put anything you need from Dev B in docs/STATUS.md under Requests.
 At the end: update STATUS.md, write the handoff note, and state clearly what was not run or tested.
 ```

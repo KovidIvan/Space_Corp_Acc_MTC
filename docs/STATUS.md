@@ -6,6 +6,7 @@ Last sync: Dev B B3 wizard/config/consent implemented and validated (2026-10-06)
 - Dev B B2 adds a Russian Jinja2 dashboard, signed owner login, call filters/detail, locally vendored HTMX, and five synthetic encrypted demo calls.
 - Dev B B3 adds a five-step setup wizard with persisted duration, AgentConfig GET/POST/PUT and audited current-version rollback, HMAC-hashed VIP numbers, consent capture/versioning, and a consent/config guard on `/ws/call`.
 - Dashboard bootstrap settings are documented in `.env.example`; the owner account is created only when dashboard settings are complete and is not overwritten on later starts.
+- Both Prompt A copies request `scripts/download_models.py` for explicit setup-time voice model downloads; the script is still pending.
 - `python -m compileall -q app tests` passed; `python -m pytest -q`: 36 passed (one upstream Starlette/httpx deprecation warning); `python -m ruff check app tests`: passed.
 - `git diff --check`: passed after normalizing line endings. `make` remains unavailable in this PowerShell environment.
 - FR-11 remains open: Telegram linking awaits B4, and an actual test call awaits Dev A's voice pipeline. FR-09 remains unchecked because call editing is pending B6.
@@ -25,6 +26,7 @@ P2: FR-22 [ ] FR-23 [ ] FR-24 [ ] FR-25 [ ] FR-26 [ ] FR-27
 ## Requests between developers
 (format: from -> to: what is needed, why, date)
 - Dev B -> Dev A: Bootstrap added docstring-only stubs under `app/voice/` and `app/agent/` per user-approved exception; confirm handoff before feature implementation, 2026-10-06.
+- Dev B -> Dev A: Implement `scripts/download_models.py`; `make setup-voice` invokes it, and Prompt A now specifies profile-selected local voice model downloads, 2026-10-06.
 - Dev B -> Dev A: `.env.example` now documents owner/session/encryption settings for B2; its five demo calls are synthetic and live in `app/core/demo_data.py` because `fixtures/` has no CallResult files, 2026-10-06.
 - Dev B -> Dev A: `/ws/call` now rejects starts without current consent; with consent it returns 1013 until the voice pipeline is implemented. Please connect the call workflow here when ready, 2026-10-06.
 
@@ -32,3 +34,4 @@ P2: FR-22 [ ] FR-23 [ ] FR-24 [ ] FR-25 [ ] FR-26 [ ] FR-27
 - The installed Starlette TestClient emits a deprecation warning about httpx; tests pass. `make` command itself is unavailable, so equivalent Python module commands were used.
 - Local `safe_http` guard denies automatic redirects; its mocked redirect test passes.
 - The caller page and voice WebSocket pipeline remain stubs; B3 only enforces consent at the call-start boundary. A real test-call is not yet available.
+- `make setup-voice` remains incomplete until `scripts/download_models.py` is added.
