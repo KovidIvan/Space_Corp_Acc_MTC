@@ -1,0 +1,1 @@
+"""Voice WebSocket protocol placeholder."""

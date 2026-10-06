@@ -13,8 +13,11 @@ dependencies = [
 voice = ["faster-whisper", "silero-vad", "torch", "soundfile", "piper-tts", "jiwer"]
 dev = ["pytest", "pytest-asyncio", "ruff"]
 
-[tool.setuptools]
-packages = ["app", "scripts"]
+[tool.setuptools.packages.find]
+include = ["app*", "scripts*"]
+
+[tool.setuptools.package-data]
+app = ["web/templates/*.html", "web/static/**/*", "voice/client/*.html", "voice/client/*.js"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

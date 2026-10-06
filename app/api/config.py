@@ -1,0 +1,5 @@
+"""Configuration API router placeholder."""
+
+from fastapi import APIRouter
+
+router = APIRouter(prefix="/api/config", tags=["config"])

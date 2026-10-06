@@ -1,0 +1,1 @@
+"""Call summary placeholder."""
