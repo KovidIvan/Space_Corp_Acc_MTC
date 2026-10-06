@@ -1,6 +1,6 @@
 # STATUS (update at the end of every work session)
 
-Last sync: Dev B B3 wizard/config/consent merged (2026-10-06)
+Last sync: Dev B B3 wizard/config/consent merged; branch histories synchronized (2026-10-06)
 
 ## Current implementation snapshot
 - Bootstrap skeleton includes core/security, SQLAlchemy ORM, interfaces/fakes, contract models, API router placeholders, and FastAPI `/health`.
@@ -8,7 +8,7 @@ Last sync: Dev B B3 wizard/config/consent merged (2026-10-06)
 - B3 adds a five-step setup wizard with persisted duration, AgentConfig GET/POST/PUT and audited current-version rollback, HMAC-hashed VIP numbers, consent capture/versioning, and a consent/config guard on `/ws/call`.
 - Dashboard bootstrap settings are documented in `.env.example`; the owner account is created only when dashboard settings are complete and is not overwritten on later starts.
 - Both Prompt A copies request `scripts/download_models.py` for explicit setup-time voice model downloads; the script is still pending.
-- B3 handoff reported 36 tests; after merging, `python -m pytest -q`: 38 passed (one upstream Starlette/httpx deprecation warning), and `python -m ruff check app tests`: passed.
+- B3 branch handoff reported 36 tests; the locally merged tree passed `python -m pytest -q`: 38 passed (one upstream Starlette/httpx deprecation warning). `python -m ruff check app tests`: passed.
 - `make` remains unavailable in this PowerShell environment.
 - FR-11 remains open: Telegram linking awaits B4, and an actual test call awaits Dev A's voice pipeline. FR-09 remains unchecked because call editing is pending B6.
 
