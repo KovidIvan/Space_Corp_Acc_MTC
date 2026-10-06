@@ -4,6 +4,7 @@ models/
 context_bundle.txt
 __pycache__/
 .venv/
+.vs/
 *.pyc
 *.egg-info/
 *.wav
