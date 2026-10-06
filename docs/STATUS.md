@@ -1,12 +1,13 @@
 # STATUS (update at the end of every work session)
 
-Last sync: Bootstrap skeleton created and locally validated (2026-10-06)
+Last sync: Prompt A updated for setup-time voice model downloads (2026-10-06)
 
 ## Bootstrap snapshot
 - Created the `app/` package skeleton, core helpers, SQLAlchemy models, interfaces/fakes, contract models, API router placeholders, and FastAPI `/health` shell.
 - Added tests for core helpers, contract samples/null parity, ORM table registration, redirect guard, and the health endpoint; latest `python -m pytest -q`: 29 passed.
 - `python -m pip install -e ".[dev]"` succeeded; Ruff passed; local Uvicorn `/health` returned `{"status":"ok"}`. `make` is unavailable in this PowerShell environment.
 - Product requirements remain unchecked; no call, dashboard, consent, or Telegram workflows were implemented. HTMX has not been vendored yet.
+- Both Prompt A copies now request a `scripts/download_models.py` setup-time downloader; the script itself is not implemented.
 
 ## Task board
 Dev A: [ ] A1 bench  [ ] A2 VAD+STT  [ ] A3 TTS+cache  [ ] A4 NLU+dialog  [ ] A5 WS session+caller page  [ ] A6 router+handoff+summary  [ ] A7 eval  [ ] A8 chat offer / extras
@@ -23,7 +24,9 @@ P2: FR-22 [ ] FR-23 [ ] FR-24 [ ] FR-25 [ ] FR-26 [ ] FR-27
 ## Requests between developers
 (format: from -> to: what is needed, why, date)
 - Dev B -> Dev A: Bootstrap added docstring-only stubs under `app/voice/` and `app/agent/` per user-approved exception; confirm handoff before feature implementation, 2026-10-06.
+- Dev B -> Dev A: Implement `scripts/download_models.py`; `make setup-voice` invokes it, and Prompt A now specifies profile-selected local voice model downloads, 2026-10-06.
 
 ## Blocked / risks
 - The installed Starlette TestClient emits a deprecation warning about httpx; tests pass. `make` command itself is unavailable, so equivalent Python module commands were used.
 - Local `safe_http` guard denies automatic redirects; its mocked redirect test passes.
+- `make setup-voice` remains incomplete until `scripts/download_models.py` is added.
