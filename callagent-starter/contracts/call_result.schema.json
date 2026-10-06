@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CallResult",
+  "type": "object",
+  "required": ["call_id", "started_at", "ended_at", "caller", "transcript", "intent", "urgency", "slots", "summary_ru", "action"],
+  "properties": {
+    "call_id": {"type": "string"},
+    "started_at": {"type": "string", "format": "date-time"},
+    "ended_at": {"type": "string", "format": "date-time"},
+    "duration_s": {"type": "number"},
+    "caller": {
+      "type": "object",
+      "required": ["masked"],
+      "properties": {"masked": {"type": "string"}, "hash": {"type": "string"}, "is_vip": {"type": "boolean"}}
+    },
+    "transcript": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["who", "text"],
+        "properties": {
+          "who": {"enum": ["caller", "agent"]},
+          "start_s": {"type": "number"},
+          "text": {"type": "string"},
+          "words": {"type": "array", "items": {"type": "object", "required": ["w", "p"], "properties": {"w": {"type": "string"}, "p": {"type": "number", "minimum": 0, "maximum": 1}}}}
+        }
+      }
+    },
+    "intent": {"enum": ["client", "partner", "vendor_sales", "spam", "job_candidate", "other", "unclear"]},
+    "urgency": {"enum": ["low", "normal", "high"]},
+    "slots": {
+      "type": "object",
+      "properties": {"name": {"type": ["string", "null"]}, "company": {"type": ["string", "null"]}, "reason": {"type": ["string", "null"]},
+        "callback_number": {"type": ["string", "null"]}, "deadline": {"type": ["string", "null"]}}
+    },
+    "summary_ru": {"type": "string"},
+    "action": {"enum": ["answer_faq", "take_message", "offer_chat", "handoff", "decline"]},
+    "handoff": {"type": "object", "properties": {"performed": {"type": "boolean"}, "reason": {"type": "string"}}},
+    "no_record": {"type": "boolean", "default": false},
+    "stt_avg_conf": {"type": "number"},
+    "latency_ms_p50": {"type": "number"}
+  }
+}

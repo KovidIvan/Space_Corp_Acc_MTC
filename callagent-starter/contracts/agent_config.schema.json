@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentConfig",
+  "type": "object",
+  "required": ["version", "owner", "greeting", "disclosure", "closing", "routing", "handoff_number"],
+  "properties": {
+    "version": {"type": "integer", "minimum": 1},
+    "owner": {
+      "type": "object",
+      "required": ["name", "company"],
+      "properties": {"name": {"type": "string"}, "company": {"type": "string"}, "role": {"type": "string"}}
+    },
+    "template": {"type": "string", "description": "Scenario template id chosen in the wizard"},
+    "greeting": {"type": "string"},
+    "disclosure": {"type": "string", "description": "Spoken AI and recording notice, always played at call start"},
+    "closing": {"type": "string"},
+    "faq": {
+      "type": "array",
+      "items": {"type": "object", "required": ["id", "question", "answer"],
+        "properties": {"id": {"type": "string"}, "question": {"type": "string"}, "answer": {"type": "string"}}}
+    },
+    "examples": {
+      "type": "array",
+      "items": {"type": "object", "required": ["utterance", "intent", "urgency"],
+        "properties": {"utterance": {"type": "string"}, "intent": {"$ref": "#/$defs/intent"}, "urgency": {"$ref": "#/$defs/urgency"}}}
+    },
+    "routing": {"type": "array", "items": {"$ref": "#/$defs/rule"}},
+    "vip_numbers": {"type": "array", "items": {"type": "string"}, "description": "Stored hashed server-side"},
+    "handoff_number": {"type": "string"},
+    "working_hours": {
+      "type": "object",
+      "properties": {"tz": {"type": "string"}, "days": {"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 7}},
+        "start": {"type": "string"}, "end": {"type": "string"}}
+    },
+    "retention_days": {"type": "integer", "minimum": 0, "default": 30},
+    "store_audio": {"type": "boolean", "default": false},
+    "notice_detail": {"enum": ["minimal", "names"], "default": "minimal"}
+  },
+  "$defs": {
+    "intent": {"enum": ["client", "partner", "vendor_sales", "spam", "job_candidate", "other", "unclear"]},
+    "urgency": {"enum": ["low", "normal", "high"]},
+    "action": {"enum": ["answer_faq", "take_message", "offer_chat", "handoff", "decline"]},
+    "rule": {
+      "type": "object",
+      "required": ["id", "priority", "action"],
+      "properties": {
+        "id": {"type": "string"},
+        "priority": {"type": "integer", "description": "Lower number is evaluated first"},
+        "when": {
+          "type": "object",
+          "properties": {
+            "intent": {"type": "array", "items": {"$ref": "#/$defs/intent"}},
+            "urgency": {"type": "array", "items": {"$ref": "#/$defs/urgency"}},
+            "is_vip": {"type": "boolean"},
+            "outside_hours": {"type": "boolean"},
+            "wants_human": {"type": "boolean"},
+            "wants_chat": {"type": "boolean"}
+          }
+        },
+        "action": {"$ref": "#/$defs/action"}
+      }
+    }
+  }
+}

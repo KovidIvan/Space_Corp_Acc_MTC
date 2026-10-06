@@ -1,0 +1,24 @@
+[project]
+name = "callagent"
+version = "0.1.0"
+description = "Local Russian-speaking AI assistant for incoming calls (hackathon prototype)"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi", "uvicorn[standard]", "jinja2", "python-multipart", "itsdangerous",
+  "sqlalchemy>=2", "pydantic>=2", "pydantic-settings", "cryptography", "argon2-cffi",
+  "aiogram>=3", "httpx", "numpy", "jsonschema",
+]
+
+[project.optional-dependencies]
+voice = ["faster-whisper", "silero-vad", "torch", "soundfile", "piper-tts", "jiwer"]
+dev = ["pytest", "pytest-asyncio", "ruff"]
+
+[tool.setuptools]
+packages = ["app", "scripts"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
