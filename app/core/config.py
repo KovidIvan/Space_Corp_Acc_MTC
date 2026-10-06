@@ -22,7 +22,23 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/callagent.db"
     data_encryption_key: SecretStr | None = None
     session_secret: SecretStr | None = None
+    owner_name: str | None = None
+    owner_company: str | None = None
+    owner_password: SecretStr | None = None
     telegram_bot_token: SecretStr | None = None
+
+    @property
+    def dashboard_configured(self) -> bool:
+        """Whether all secrets and owner details required by the dashboard are set."""
+        return all(
+            (
+                self.owner_name,
+                self.owner_company,
+                self.owner_password and self.owner_password.get_secret_value(),
+                self.session_secret and self.session_secret.get_secret_value(),
+                self.data_encryption_key and self.data_encryption_key.get_secret_value(),
+            )
+        )
 
 
 settings = Settings()

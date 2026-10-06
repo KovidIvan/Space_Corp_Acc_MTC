@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Звонок{% endblock %}
+{% block content %}
+<a class="text-link back-link" href="/calls">← Все звонки</a>
+<section class="page-heading detail-heading">
+    <div>
+        <p class="eyebrow">Карточка звонка</p>
+        <h1>{{ call.caller_masked or 'Номер не определён' }}</h1>
+        <p class="muted">{{ call.started_at.strftime('%d.%m.%Y в %H:%M') }}</p>
+    </div>
+    <span class="badge urgency-{{ call.urgency or 'unknown' }}">{{ urgency_labels.get(call.urgency, 'Срочность не определена') }}</span>
+</section>
+<div class="detail-grid">
+    <section class="panel detail-panel">
+        <h2>Краткое содержание</h2>
+        <p class="summary-text">{{ summary or 'Краткое содержание отсутствует.' }}</p>
+        <dl class="facts">
+            <div><dt>Тип обращения</dt><dd>{{ intent_labels.get(call.intent, 'Не определён') }}</dd></div>
+            <div><dt>Статус</dt><dd>{{ 'Обработан' if call.handled else 'Новый' }}</dd></div>
+            <div><dt>Действие</dt><dd>{{ action_labels.get(call.action, 'Не указано') }}</dd></div>
+        </dl>
+    </section>
+    <section class="panel detail-panel">
+        <h2>Расшифровка</h2>
+        {% if transcript %}
+        <div class="transcript">
+            {% for segment in transcript %}
+            <article class="transcript-segment">
+                <span class="speaker">{{ 'Звонивший' if segment.who == 'caller' else 'Ассистент' }}</span>
+                <p>
+                {% if segment.words %}
+                    {% for word in segment.words %}<span class="{% if word.p < 0.6 %}low-confidence{% endif %}" {% if word.p < 0.6 %}title="Низкая уверенность: {{ (word.p * 100)|round|int }}%"{% endif %}>{{ word.w }} </span>{% endfor %}
+                {% else %}{{ segment.text }}{% endif %}
+                </p>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">Расшифровка не сохранена.</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

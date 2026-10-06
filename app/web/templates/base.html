@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Звонки{% endblock %} — Space Corp</title>
+    <link rel="stylesheet" href="/static/dashboard.css">
+    <script src="/static/vendor/htmx.min.js" defer></script>
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="/calls">Space Corp <span>Ассистент звонков</span></a>
+        {% if owner %}
+        <div class="account">
+            <span>{{ owner.name }}</span>
+            <form action="/api/auth/logout" method="post">
+                <button class="button button-quiet" type="submit">Выйти</button>
+            </form>
+        </div>
+        {% endif %}
+    </header>
+    <main class="page">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
