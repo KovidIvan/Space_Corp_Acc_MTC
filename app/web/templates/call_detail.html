@@ -7,6 +7,7 @@
         <p class="eyebrow">Карточка звонка</p>
         <h1>{{ call.caller_masked or 'Номер не определён' }}</h1>
         <p class="muted">{{ call.started_at.strftime('%d.%m.%Y в %H:%M') }}</p>
+        {% if call.edited %}<span class="badge edited-badge">Изменён</span>{% endif %}
     </div>
     <span class="badge urgency-{{ call.urgency or 'unknown' }}">{{ urgency_labels.get(call.urgency, 'Срочность не определена') }}</span>
 </section>
@@ -40,4 +41,38 @@
         {% endif %}
     </section>
 </div>
+{% if not call.no_record %}
+<section class="panel edit-panel">
+    <h2>Редактирование звонка</h2>
+    <form id="call-edit-form" class="form-stack" data-call-id="{{ call.id }}">
+        <label for="edit-summary">Краткое содержание</label>
+        <textarea id="edit-summary" name="summary" rows="4">{{ summary }}</textarea>
+        <div class="inline-fields">
+            <label for="edit-intent">Тип обращения
+                <select id="edit-intent" name="intent">
+                    {% for value, label in intent_labels.items() %}<option value="{{ value }}" {% if call.intent == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+            </label>
+            <label for="edit-urgency">Срочность
+                <select id="edit-urgency" name="urgency">
+                    {% for value, label in urgency_labels.items() %}<option value="{{ value }}" {% if call.urgency == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+            </label>
+            <label for="edit-action">Действие
+                <select id="edit-action" name="action">
+                    {% for value, label in action_labels.items() %}<option value="{{ value }}" {% if call.action == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+            </label>
+        </div>
+        {% for segment in transcript %}
+        <label for="edit-segment-{{ loop.index0 }}">Текст сегмента {{ loop.index }} — {{ 'Звонивший' if segment.who == 'caller' else 'Ассистент' }}</label>
+        <textarea id="edit-segment-{{ loop.index0 }}" name="segment-{{ loop.index0 }}" rows="3">{{ segment.text }}</textarea>
+        {% endfor %}
+        <script id="transcript-data" type="application/json">{{ transcript|tojson }}</script>
+        <p id="edit-message" class="muted" role="status" aria-live="polite"></p>
+        <button class="button button-primary" type="submit">Сохранить изменения</button>
+    </form>
+</section>
+<script src="/static/call_edit.js" defer></script>
+{% endif %}
 {% endblock %}

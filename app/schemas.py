@@ -122,3 +122,15 @@ class CallResult(ContractModel):
     no_record: bool = False
     stt_avg_conf: float = Field(default=None)
     latency_ms_p50: float = Field(default=None)
+
+
+class CallEdit(ContractModel):
+    """Editable call fields accepted from an authenticated dashboard owner."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    transcript: list[TranscriptSegment] | None = None
+    summary: str | None = None
+    intent: Intent | None = None
+    urgency: Urgency | None = None
+    action: Action | None = None

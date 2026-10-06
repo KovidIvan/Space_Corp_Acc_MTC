@@ -17,7 +17,7 @@ from app.core.db import get_db
 from app.core.security import decrypt_text, encrypt_text
 from app.interfaces import Notice
 from app.models import CallRecord, Owner
-from app.schemas import CallResult
+from app.schemas import CallEdit, CallResult
 
 router = APIRouter(prefix="/api/calls", tags=["calls"])
 LOGGER = logging.getLogger(__name__)
@@ -200,3 +200,55 @@ def get_call(
         "transcript": transcript,
         "summary": summary,
     }
+
+
+@router.patch("/{call_id}")
+def edit_call(
+    call_id: str,
+    update: CallEdit,
+    request: Request,
+    owner: Annotated[Owner, Depends(require_owner)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, Any]:
+    """Update selected call fields, encrypt private content, and audit changed field names."""
+    call = db.get(CallRecord, call_id)
+    if call is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call not found")
+    if call.no_record:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Calls marked no_record cannot be edited")
+
+    changes = update.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No fields to update")
+
+    encryption_key = request.app.state.settings.data_encryption_key
+    if encryption_key is None or not encryption_key.get_secret_value():
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Call storage encryption is not configured")
+
+    key = encryption_key.get_secret_value()
+    try:
+        if "transcript" in changes:
+            transcript_json = json.dumps(
+                [segment.model_dump(mode="json", exclude_none=True) for segment in update.transcript or []],
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            call.transcript_enc = encrypt_text(transcript_json, key)
+        if "summary" in changes:
+            call.summary_enc = encrypt_text(update.summary or "", key)
+    except (TypeError, ValueError) as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Invalid call content") from error
+
+    for field in ("intent", "urgency", "action"):
+        if field in changes:
+            setattr(call, field, changes[field])
+    call.edited = True
+    record_audit_event(
+        db,
+        owner.id,
+        "edit",
+        call.id,
+        {"fields": sorted(changes)},
+    )
+    db.commit()
+    return {"id": call.id, "edited": call.edited, "fields": sorted(changes)}
