@@ -1,42 +1,50 @@
 # STATUS (update at the end of every work session)
 
-Last sync: Dev B B5 CallResult ingest/notification trigger implemented and locally validated (2026-10-06)
+Last sync: Dev A (A2, A3, A4, router part of A6) and Dev B (B1–B5) implemented and locally validated (2026-10-06). Approaching Sync Point S1.
 
 ## Current implementation snapshot
-- Dev B B2 adds a Russian Jinja2 dashboard, signed owner login, call filters/detail, locally vendored HTMX, and five synthetic encrypted demo calls.
-- Dev B B3 adds a five-step setup wizard with persisted duration, AgentConfig GET/POST/PUT and audited current-version rollback, HMAC-hashed VIP numbers, consent capture/versioning, and a consent/config guard on `/ws/call`.
-- Dev B B4 adds a one-time, 10-minute Telegram owner deep link (only its hash is stored), masked Telegram notices through `safe_http`, and a linked-chat-only, audited “mark handled” callback. The adapter uses SafeHttpClient-backed Bot API polling and is managed by the FastAPI lifespan.
-- Dev B B5 adds loopback-only `POST /api/calls/ingest`; CallResults are validated, encrypted and audited before B4 `Channel.notify()` is invoked. Duplicate IDs are idempotent; `no_record` calls retain only an encrypted callback number when present.
-- Dashboard bootstrap settings are documented in `.env.example`; the owner account is created only when dashboard settings are complete and is not overwritten on later starts.
-- Both Prompt A copies request `scripts/download_models.py` for explicit setup-time voice model downloads; the script is still pending.
-- `python -m compileall -q app tests` passed; `python -m pytest -q`: 48 passed (one upstream Starlette/httpx deprecation warning); `python -m ruff check app tests`: passed.
-- `git -c core.whitespace=cr-at-eol diff --check` passed. `make` remains unavailable in this PowerShell environment.
-- FR-11 remains open until Telegram is verified with a configured live bot and the actual test call is available from Dev A. FR-08 implementation is present but its demo-arrival criterion has not been live-tested. FR-09 remains unchecked because call editing is pending B6.
+- Dev B completed B1–B5:
+  - B1: Core configuration, safe_http outbound allowlist (localhost and api.telegram.org), PII log mask filter, Fernet encryption at rest, SHA-256 tamper-evident audit hash chain, and SQLAlchemy models.
+  - B2: Russian Jinja2 dashboard shell, signed owner authentication, call list with filters (urgency, intent, handled), call detail with decrypted content, vendored local HTMX, and 5 synthetic encrypted demo calls.
+  - B3: Five-step business setup wizard with persisted elapsed duration (`WizardRun`), `AgentConfig` versioned CRUD with audited current-version rollback, HMAC-hashed VIP numbers, consent capture and text versioning, and consent guard on `/ws/call`.
+  - B4: Telegram owner deep link (one-time, 10-minute token stored as SHA-256 hash), masked Telegram notices through `safe_http`, and linked-chat-only, audited "mark handled" callback. SafeHttpClient-backed Bot API polling managed by FastAPI lifespan.
+  - B5: Loopback-only `POST /api/calls/ingest`; CallResults are validated against schema, encrypted, and audited before B4 `Channel.notify()` is triggered. Duplicate call IDs are idempotent; `no_record` calls retain only encrypted callback numbers.
+- Dev A completed A2, A3, A4, download script, and A6 router:
+  - A2: `app/voice/vad.py` (Silero VAD wrapper, `VADSegmenter` with 700 ms silence detection) and `app/voice/stt.py` (`FasterWhisperSTT` adapter using CTranslate2 int8 local model, returning word probabilities).
+  - A3: `app/voice/tts.py` (`LocalTTS` adapter supporting Piper/Silero and silent PCM fallback) and `app/voice/phrases_cache.py` (`PhrasesCache` pre-rendering greeting, disclosure, and fixed phrases for zero initial latency).
+  - `scripts/download_models.py`: Offline model downloader downloading faster-whisper and Silero VAD into `models/` for `make setup-voice`.
+  - A4: `app/agent/llm_client.py` (`OllamaLLM` adapter using `SafeHttpClient` restricted to localhost), `prompts/nlu.ru.md` (Russian prompt for structured JSON extraction), `app/agent/nlu.py` (`understand_turn` with Ollama structured extraction and `rules_nlu` keyword fallback), and `app/agent/dialog.py` (`DialogSession` state machine, slot merging, re-ask limit <= 2, turn limit <= 8, polite closing).
+  - A6 (partial): `app/agent/router.py` evaluating ordered `RoutingRule` priority (FR-05) and emergency handoff on `wants_human` / VIP (FR-06). `app/agent/summarizer.py` and `prompts/summary.ru.md` remain pending.
+- Current test suite: **116 passed** (`python -m pytest -q`), 1 upstream Starlette/httpx deprecation warning.
+- `python -m compileall -q app tests`: passed.
+- `python -m ruff check app tests`: 12 lint errors detected in newly added Dev A modules (formatting/imports/exceptions).
+- `make` remains unavailable in this Windows PowerShell environment; Python module commands (`python -m ...`) are used.
 
 ## Task board
-Dev A: [ ] A1 bench  [ ] A2 VAD+STT  [ ] A3 TTS+cache  [ ] A4 NLU+dialog  [ ] A5 WS session+caller page  [ ] A6 router+handoff+summary  [ ] A7 eval  [ ] A8 chat offer / extras
+Dev A: [ ] A1 bench  [x] A2 VAD+STT  [x] A3 TTS+cache  [x] A4 NLU+dialog  [ ] A5 WS session+caller page  [ ] A6 router+handoff+summary (router done, summarizer pending)  [ ] A7 eval  [ ] A8 chat offer / extras
 Dev B: [x] B1 core+security  [x] B2 dashboard shell  [x] B3 wizard+config+consent  [x] B4 Telegram  [x] B5 ingest+notify  [ ] B6 editing+audit  [ ] B7 editors  [ ] B8 stats+settings+offline test
 
 ## Requirements progress
-P0: FR-01 [ ] FR-02 [ ] FR-03 [ ] FR-04 [ ] FR-05 [ ] FR-06 [ ] FR-07 [x] FR-08 [ ] FR-09 [ ] FR-10 [ ] FR-11 [ ] FR-12 [x] FR-13 [ ] FR-14 [ ]
+P0: FR-01 [ ] FR-02 [ ] FR-03 [ ] FR-04 [x] FR-05 [x] FR-06 [x] FR-07 [x] FR-08 [ ] FR-09 [ ] FR-10 [ ] FR-11 [ ] FR-12 [x] FR-13 [x] FR-14 [x]
 P1: FR-15 [ ] FR-16 [ ] FR-17 [ ] FR-18 [ ] FR-19 [ ] FR-20 [x] FR-21 [ ]
-P2: FR-22 [ ] FR-23 [ ] FR-24 [ ] FR-25 [ ] FR-26 [ ] FR-27
+P2: FR-22 [ ] FR-23 [ ] FR-24 [ ] FR-25 [ ] FR-26 [ ] FR-27 [ ]
 
 ## Chosen profile and measured numbers
-(filled by A1: PROFILE, whisper size, LLM model, TTS, latency p50)
+(filled by A1: PROFILE, whisper size, LLM model, TTS, latency p50 - awaiting `scripts/bench.py`)
 
 ## Requests between developers
 (format: from -> to: what is needed, why, date)
-- Dev B -> Dev A: Bootstrap added docstring-only stubs under `app/voice/` and `app/agent/` per user-approved exception; confirm handoff before feature implementation, 2026-10-06.
-- Dev B -> Dev A: Implement `scripts/download_models.py`; `make setup-voice` invokes it, and Prompt A now specifies profile-selected local voice model downloads, 2026-10-06.
-- Dev B -> Dev A: `.env.example` now documents owner/session/encryption settings for B2; its five demo calls are synthetic and live in `app/core/demo_data.py` because `fixtures/` has no CallResult files, 2026-10-06.
-- Dev B -> Dev A: `/ws/call` now rejects starts without current consent; with consent it returns 1013 until the voice pipeline is implemented. Please connect the call workflow here when ready, 2026-10-06.
-- Dev B -> Dev A: Submit the completed, contract-shaped CallResult to local `POST /api/calls/ingest` after call completion. It accepts loopback requests without dashboard cookies, returns 201 for new and 200 for duplicate call IDs; B5 invokes B4 `Channel.notify()` after commit. For `no_record`, only `slots.callback_number` is retained, encrypted; transcript, summary and other slots are discarded. FR-17 offer_chat remains separate for A8 coordination, 2026-10-06.
+- [RESOLVED] Dev B -> Dev A: Implement `scripts/download_models.py`; `make setup-voice` invokes it, 2026-10-06. (Resolved by Dev A in 22:31 commit).
+- [RESOLVED] Dev B -> Dev A: Stubs under `app/voice/` and `app/agent/` replaced with implementations for VAD, STT, TTS, phrases cache, NLU, dialog, and router, 2026-10-06.
+- Dev B -> Dev A: Wire `/ws/call` WebSocket session (`app/voice/session.py`, `app/voice/protocol.py`, `app/voice/client/`) and connect CallResult output to `POST /api/calls/ingest` to complete Sync Point S1 (vertical slice), 2026-10-06.
+- Dev B -> Dev A: Implement `app/agent/summarizer.py` and `prompts/summary.ru.md` so that CallResult has an accurate Russian summary before ingestion, 2026-10-06.
+- Dev B -> Dev A: Implement `scripts/bench.py` (A1) to benchmark Whisper/Ollama/TTS latency and record the chosen PROFILE in `docs/DECISIONS.md`, 2026-10-06.
+- Dev A -> Dev B / Dev A: Clean up 12 ruff lint issues in `app/agent/` and `app/voice/` modules, 2026-10-06.
 
 ## Blocked / risks
-- The installed Starlette TestClient emits a deprecation warning about httpx; tests pass. `make` command itself is unavailable, so equivalent Python module commands were used.
-- Local `safe_http` guard denies automatic redirects; its mocked redirect test passes.
-- The caller page and voice WebSocket pipeline remain stubs; B3 only enforces consent at the call-start boundary. A real test-call is not yet available.
-- Telegram behavior was verified with synthetic data and mocked Bot API responses only; live bot linking and delivery were not tested in this session.
-- B5 ingestion and notification trigger are tested locally with a fake channel; the Dev A CallResult producer and end-to-end S1 flow are not yet connected. FR-08 remains unchecked until a live Telegram notice is confirmed. FR-21 storage handling is implemented, but S8 voice-path behavior still depends on Dev A.
-- `make setup-voice` remains incomplete until `scripts/download_models.py` is added.
+- Sync Point S1 is blocked on A5: `app/voice/session.py`, `app/voice/protocol.py`, and `app/voice/client/` are stubs. `/ws/call` rejects actual voice sessions with code 1013 until session wiring is implemented.
+- `app/agent/summarizer.py` is a stub; completed calls need a summary to populate `CallResult.summary_ru` before ingestion.
+- `scripts/bench.py` (A1) has not been run; hardware profile is not formally calibrated.
+- Telegram adapter was verified against mocked Bot API responses; live bot token and delivery in a real test call are pending.
+- `make` is unavailable on Windows PowerShell; documentation and scripts should use `python -m` commands where appropriate.
+- 12 ruff lint errors in `app/agent/` and `app/voice/` need fixing to keep codebase clean.
