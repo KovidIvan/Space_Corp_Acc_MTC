@@ -1,6 +1,7 @@
 """Tests for privacy, outbound URL, security, configuration, and audit helpers."""
 
 import logging
+from pathlib import Path
 
 import httpx
 import pytest
@@ -103,6 +104,28 @@ def test_settings_profile_and_defaults() -> None:
     assert settings.profile == "gpu_mid"
     assert settings.offline_mode is False
     assert settings.max_concurrent_calls == 1
+
+
+def test_settings_load_dotenv_from_project_root_independent_of_working_directory() -> None:
+    expected_env_file = Path(__file__).resolve().parents[1] / ".env"
+
+    assert Settings.model_config["env_file"] == expected_env_file
+
+
+def test_settings_parse_dotenv_values_without_exposing_them(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "OWNER_NAME=Test Owner\n"
+        "OWNER_COMPANY=Test Company\n"
+        "OWNER_PASSWORD=synthetic-password\n"
+        "SESSION_SECRET=synthetic-session-secret\n"
+        "DATA_ENCRYPTION_KEY=synthetic-encryption-key\n",
+        encoding="utf-8",
+    )
+
+    settings = Settings(_env_file=env_file)
+
+    assert settings.dashboard_configured
 
 
 def test_audit_hash_chain_detects_tampering_and_link_breaks() -> None:

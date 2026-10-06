@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Настройка завершена{% endblock %}
+{% block content %}
+<section class="panel wizard-complete">
+    <p class="eyebrow">Первый запуск</p>
+    <h1>Настройка сохранена</h1>
+    <p class="muted">Версия конфигурации: {{ config_version }}. Время настройки: {{ "%.2f"|format(seconds) }} сек.</p>
+    <div class="notice">Согласие сохранено. Проверка подтверждает, что согласие есть, но голосовой обработчик ещё не подключён.</div>
+    <div class="wizard-actions complete-actions">
+        <a class="button button-secondary" href="/calls">Перейти к звонкам</a>
+        <button id="test-call" class="button button-primary" type="button">Проверить тестовый звонок</button>
+    </div>
+    <p id="test-call-status" class="muted" role="status" aria-live="polite"></p>
+</section>
+<script src="/static/setup_test_call.js" defer></script>
+{% endblock %}

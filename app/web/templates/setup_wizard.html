@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Настройка ассистента{% endblock %}
+{% block content %}
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Первый запуск</p>
+        <h1>Настройка ассистента</h1>
+        <p class="muted">Пять коротких шагов. Продолжительность настройки будет сохранена.</p>
+    </div>
+    <div class="count-card wizard-timer" aria-live="off">
+        <strong id="wizard-timer">00:00</strong>
+        <span>время настройки</span>
+    </div>
+</section>
+<section class="panel wizard-panel">
+    <div class="wizard-progress" aria-label="Прогресс настройки">
+        <span id="wizard-step-label">Шаг 1 из 5</span>
+        <progress id="wizard-progress" value="1" max="5"></progress>
+    </div>
+    <form id="setup-wizard" data-elapsed="{{ wizard_seconds }}" novalidate>
+        <section class="wizard-step" data-step="1">
+            <p class="eyebrow">Профиль бизнеса</p>
+            <h2>Расскажите об организации</h2>
+            <div class="form-stack">
+                <label for="owner-name">Имя владельца</label>
+                <input id="owner-name" name="owner_name" value="{{ values.owner_name }}" maxlength="200" required>
+                <label for="owner-company">Название компании</label>
+                <input id="owner-company" name="owner_company" value="{{ values.owner_company }}" maxlength="200" required>
+                <label for="owner-role">Роль владельца (необязательно)</label>
+                <input id="owner-role" name="owner_role" value="{{ values.owner_role }}" maxlength="200">
+            </div>
+        </section>
+        <section class="wizard-step" data-step="2" hidden>
+            <p class="eyebrow">Сценарий общения</p>
+            <h2>Выберите тон и фразы ассистента</h2>
+            <div class="form-stack">
+                <label for="scenario-template">Шаблон сценария</label>
+                <select id="scenario-template" name="template">
+                    <option value="small_business" {% if values.template == 'small_business' %}selected{% endif %}>Небольшой бизнес</option>
+                    <option value="service_business" {% if values.template == 'service_business' %}selected{% endif %}>Сервисная компания</option>
+                </select>
+                <label for="greeting">Приветствие</label>
+                <textarea id="greeting" name="greeting" rows="3" required>{{ values.greeting }}</textarea>
+                <label for="disclosure">Уведомление об ИИ и обработке звонка</label>
+                <textarea id="disclosure" name="disclosure" rows="3" required>{{ values.disclosure }}</textarea>
+                <label for="closing">Завершение разговора</label>
+                <textarea id="closing" name="closing" rows="2" required>{{ values.closing }}</textarea>
+            </div>
+        </section>
+        <section class="wizard-step" data-step="3" hidden>
+            <p class="eyebrow">Правила и расписание</p>
+            <h2>Укажите срочные контакты и часы работы</h2>
+            <div class="form-stack">
+                <label for="handoff-number">Номер для передачи срочного звонка</label>
+                <input id="handoff-number" name="handoff_number" value="{{ values.handoff_number }}" autocomplete="tel" required>
+                <label for="vip-numbers">VIP-номера, по одному на строку (необязательно)</label>
+                <textarea id="vip-numbers" name="vip_numbers" rows="3" autocomplete="off"></textarea>
+                <input id="saved-vip-hashes" name="saved_vip_hashes" type="hidden" value="{{ values.saved_vip_hashes|join(',') }}">
+                {% if values.saved_vip_hashes %}<p class="muted">Сохранено VIP-номеров: {{ values.saved_vip_hashes|length }}. Они хранятся в виде хешей и не отображаются повторно.</p>{% endif %}
+                <label for="working-timezone">Часовой пояс</label>
+                <input id="working-timezone" name="timezone" value="{{ values.timezone }}" required>
+                <div class="inline-fields">
+                    <label>Начало работы<input name="work_start" type="time" value="{{ values.work_start }}" required></label>
+                    <label>Окончание работы<input name="work_end" type="time" value="{{ values.work_end }}" required></label>
+                </div>
+                <fieldset class="day-picker">
+                    <legend>Рабочие дни</legend>
+                    {% for day, label in [(1, 'Пн'), (2, 'Вт'), (3, 'Ср'), (4, 'Чт'), (5, 'Пт'), (6, 'Сб'), (7, 'Вс')] %}
+                    <label><input type="checkbox" name="working_days" value="{{ day }}" {% if day in values.working_days %}checked{% endif %}>{{ label }}</label>
+                    {% endfor %}
+                </fieldset>
+            </div>
+        </section>
+        <section class="wizard-step" data-step="4" hidden>
+            <p class="eyebrow">Telegram</p>
+            <h2>Подключение уведомлений</h2>
+            <div class="notice">
+                Привязка Telegram через защищённую ссылку будет доступна на следующем этапе B4. Сейчас можно продолжить настройку; уведомления начнут работать после привязки.
+            </div>
+            <p class="muted">Не вводите здесь токен бота или код доступа.</p>
+        </section>
+        <section class="wizard-step" data-step="5" hidden>
+            <p class="eyebrow">Согласие и проверка</p>
+            <h2>Подтвердите настройку</h2>
+            <div class="consent-copy">{{ consent_text }}</div>
+            <label class="consent-control">
+                <input id="consent-accepted" type="checkbox" required>
+                <span>Принимаю согласие версии {{ consent_version }}</span>
+            </label>
+            <div id="wizard-message" class="notice" role="status" hidden></div>
+            <p class="muted">После сохранения можно проверить доступность тестового звонка. Голосовой обработчик пока подключается Dev A.</p>
+        </section>
+        <div class="wizard-actions">
+            <button id="wizard-back" class="button button-secondary" type="button" hidden>Назад</button>
+            <span></span>
+            <button id="wizard-next" class="button button-primary" type="button">Далее</button>
+            <button id="wizard-finish" class="button button-primary" type="submit" hidden>Сохранить и завершить</button>
+        </div>
+    </form>
+</section>
+<script src="/static/setup_wizard.js" defer></script>
+{% endblock %}
