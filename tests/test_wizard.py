@@ -231,15 +231,6 @@ def test_consent_config_timer_and_websocket_guard(
     assert removed_latest.status_code == 200
     assert wizard_client.get("/api/config").json()["version"] == 1
 
-<<<<<<< HEAD
-    # After config deletion, no config exists so /ws/call endpoint should close  
-    try:
-        with wizard_client.websocket_connect("/ws/call") as websocket:
-            # CallSession checks for config and closes if missing
-            websocket.receive_text()  # This should timeout or raise
-    except WebSocketDisconnect:
-        pass  # Expected: config was deleted, connection rejected
-=======
     from app.voice.session import CallSession
 
     session_calls: list[bool] = []
@@ -253,7 +244,6 @@ def test_consent_config_timer_and_websocket_guard(
     with wizard_client.websocket_connect("/ws/call") as websocket:
         assert websocket.receive_text() == "session-started"
     assert session_calls == [True]
->>>>>>> 34da9783c58be4a772b28c0903a9f8be978ea23a
 
     assert wizard_client.delete("/api/config/1").status_code == 200
     assert wizard_client.get("/api/config").status_code == 404

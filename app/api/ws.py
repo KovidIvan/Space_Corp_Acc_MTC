@@ -27,10 +27,5 @@ async def call(websocket: WebSocket) -> None:
         return
 
     await websocket.accept()
-<<<<<<< HEAD
-=======
-    from app.voice.session import CallSession
-
->>>>>>> 34da9783c58be4a772b28c0903a9f8be978ea23a
     session = CallSession(websocket)
     await session.run()
