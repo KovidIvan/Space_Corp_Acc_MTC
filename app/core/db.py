@@ -9,6 +9,8 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 
 class Base(DeclarativeBase):
     """Base class for application ORM models."""
@@ -18,8 +20,13 @@ def _create_engine(database_url: str) -> Engine:
     url = make_url(database_url)
     connect_args = {"check_same_thread": False} if url.get_backend_name() == "sqlite" else {}
     if url.get_backend_name() == "sqlite" and url.database not in {None, ":memory:"}:
-        Path(url.database).parent.mkdir(parents=True, exist_ok=True)
-    return create_engine(database_url, connect_args=connect_args)
+        database_path = Path(url.database)
+        if not database_path.is_absolute():
+            database_path = PROJECT_ROOT / database_path
+        database_path = database_path.resolve()
+        database_path.parent.mkdir(parents=True, exist_ok=True)
+        url = url.set(database=str(database_path))
+    return create_engine(url, connect_args=connect_args)
 
 
 engine = _create_engine(settings.database_url)
