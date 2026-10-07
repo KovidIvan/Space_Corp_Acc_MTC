@@ -25,8 +25,26 @@ MASKED_CALLER_PATTERN = re.compile(r"^[+\d*() .-]{4,40}$")
 LOGGER = logging.getLogger(__name__)
 
 
+def _telegram_error_category(status_code: int) -> str:
+    if status_code == 401:
+        return "unauthorized"
+    if status_code == 403:
+        return "forbidden"
+    if status_code == 409:
+        return "conflict"
+    if status_code == 429:
+        return "rate_limited"
+    if 500 <= status_code < 600:
+        return "server_error"
+    return "http_error"
+
+
 class TelegramApiError(RuntimeError):
     """A Telegram Bot API request failed without exposing its credentials."""
+
+    def __init__(self, message: str, *, category: str = "api_error") -> None:
+        super().__init__(message)
+        self.category = category
 
 
 class TelegramBotApi:
@@ -49,10 +67,25 @@ class TelegramBotApi:
             response = await self._http.request("POST", url, json=payload or {}, timeout=timeout)
             response.raise_for_status()
             body = response.json()
-        except (httpx.HTTPError, ValueError):
-            raise TelegramApiError("Telegram API request failed") from None
-        if not isinstance(body, dict) or body.get("ok") is not True:
-            raise TelegramApiError("Telegram API rejected the request")
+        except httpx.TimeoutException:
+            raise TelegramApiError("Telegram API request failed", category="timeout") from None
+        except httpx.ConnectError:
+            raise TelegramApiError("Telegram API request failed", category="connection") from None
+        except httpx.HTTPStatusError as error:
+            raise TelegramApiError(
+                "Telegram API request failed",
+                category=_telegram_error_category(error.response.status_code),
+            ) from None
+        except httpx.HTTPError:
+            raise TelegramApiError("Telegram API request failed", category="transport") from None
+        except ValueError:
+            raise TelegramApiError("Telegram API response was invalid", category="invalid_response") from None
+        if not isinstance(body, dict):
+            raise TelegramApiError("Telegram API response was invalid", category="invalid_response")
+        if body.get("ok") is not True:
+            error_code = body.get("error_code")
+            category = _telegram_error_category(error_code) if isinstance(error_code, int) else "api_rejected"
+            raise TelegramApiError("Telegram API rejected the request", category=category)
         result = body.get("result")
         return result if isinstance(result, (dict, list)) else {}
 
@@ -60,10 +93,10 @@ class TelegramBotApi:
         """Return the configured bot username after validating Telegram's response."""
         result = await self.call("getMe")
         if not isinstance(result, dict):
-            raise TelegramApiError("Telegram bot identity is unavailable")
+            raise TelegramApiError("Telegram bot identity is unavailable", category="invalid_response")
         username = result.get("username")
         if not isinstance(username, str) or not BOT_USERNAME_PATTERN.fullmatch(username):
-            raise TelegramApiError("Telegram bot identity is unavailable")
+            raise TelegramApiError("Telegram bot identity is unavailable", category="invalid_response")
         return username
 
     async def send_message(
@@ -174,8 +207,10 @@ class TelegramChannel:
                     await self._handle_update(update)
             except asyncio.CancelledError:
                 raise
-            except TelegramApiError:
-                LOGGER.warning("Telegram update polling failed")
+            except TelegramApiError as error:
+                LOGGER.warning("Telegram update polling failed (%s)", error.category)
+                if error.category in {"unauthorized", "forbidden", "conflict"}:
+                    return
                 await asyncio.sleep(3)
             except (SQLAlchemyError, TypeError, ValueError, RuntimeError):
                 LOGGER.warning("Telegram update processing failed")

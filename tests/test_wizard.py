@@ -163,8 +163,13 @@ def test_telegram_link_requires_login_and_issues_short_lived_deep_link(wizard_cl
 
 
 def test_websocket_call_is_rejected_without_current_consent(wizard_client: TestClient) -> None:
-    with pytest.raises(WebSocketDisconnect) as disconnected, wizard_client.websocket_connect("/ws/call"):
-        pass
+    with wizard_client.websocket_connect("/ws/call") as websocket:
+        error = websocket.receive_json()
+        assert error["type"] == "error"
+        assert error["code"] == "consent_missing"
+        assert "согласия" in error["message"].lower()
+        with pytest.raises(WebSocketDisconnect) as disconnected:
+            websocket.receive_json()
     assert disconnected.value.code == 1008
 
 
@@ -253,6 +258,11 @@ def test_consent_config_timer_and_websocket_guard(
 
     assert wizard_client.delete("/api/config/1").status_code == 200
     assert wizard_client.get("/api/config").status_code == 404
-    with pytest.raises(WebSocketDisconnect) as disconnected, wizard_client.websocket_connect("/ws/call"):
-        pass
+    with wizard_client.websocket_connect("/ws/call") as websocket:
+        error = websocket.receive_json()
+        assert error["type"] == "error"
+        assert error["code"] == "internal"
+        assert "конфигурация ассистента" in error["message"].lower()
+        with pytest.raises(WebSocketDisconnect) as disconnected:
+            websocket.receive_json()
     assert disconnected.value.code == 1008

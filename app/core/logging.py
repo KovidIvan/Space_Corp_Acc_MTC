@@ -28,6 +28,12 @@ class PiiMaskFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         """Sanitize a log record in place and allow it to be emitted."""
+        if record.name == "uvicorn.access" and isinstance(record.args, tuple):
+            if isinstance(record.msg, str):
+                record.msg = mask_pii(record.msg)
+            record.args = tuple(mask_pii(value) if isinstance(value, str) else value for value in record.args)
+            return True
+
         record.msg = mask_pii(record.getMessage())
         record.args = ()
         return True

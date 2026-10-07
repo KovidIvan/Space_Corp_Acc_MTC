@@ -71,6 +71,7 @@ async function startCall() {
 
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const wsUrl = `${protocol}//${window.location.host}/ws/call`;
+  let microphoneInitialized = false;
 
   socket = new WebSocket(wsUrl);
   socket.binaryType = "arraybuffer";
@@ -88,19 +89,21 @@ async function startCall() {
       protocol: 1,
     }));
 
-    // 2. Initialize microphone capture
-    try {
-      await initMicrophone();
-    } catch (err) {
-      console.warn("Microphone not available or permission denied:", err);
-      appendMessage("agent", "Внимание: микрофон недоступен. Вы можете нажать «Тест S1», чтобы протестировать сценарий.");
-    }
   };
 
   socket.onmessage = async (event) => {
     if (typeof event.data === "string") {
       try {
         const msg = JSON.parse(event.data);
+        if (msg.type === "state" && !microphoneInitialized) {
+          microphoneInitialized = true;
+          try {
+            await initMicrophone();
+          } catch (err) {
+            console.warn("Microphone not available or permission denied:", err);
+            appendMessage("agent", "Внимание: микрофон недоступен. Вы можете нажать «Тест S1», чтобы протестировать сценарий.");
+          }
+        }
         handleControlMessage(msg);
       } catch (e) {
         console.error("Malformed JSON frame:", e);

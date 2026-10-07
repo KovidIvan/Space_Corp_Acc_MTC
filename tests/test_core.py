@@ -6,6 +6,7 @@ from pathlib import Path
 import httpx
 import pytest
 from cryptography.fernet import Fernet, InvalidToken
+from uvicorn.logging import AccessFormatter
 
 from app.core.audit import create_audit_event, verify_chain
 from app.core.config import Settings
@@ -31,6 +32,27 @@ def test_pii_log_filter_renders_and_masks_format_arguments() -> None:
 
     assert PiiMaskFilter().filter(record)
     assert "+79991234567" not in record.getMessage()
+
+
+def test_pii_log_filter_preserves_uvicorn_access_record_arguments() -> None:
+    record = logging.LogRecord(
+        "uvicorn.access",
+        logging.INFO,
+        "server.py",
+        1,
+        '%s - "%s %s HTTP/%s" %d',
+        ("+7 (000) 123-45-67", "GET", "/call?email=synthetic@example.test", "1.1", 200),
+        None,
+    )
+
+    assert PiiMaskFilter().filter(record)
+    rendered = AccessFormatter("%(message)s").format(record)
+
+    assert len(record.args) == 5
+    assert "[PHONE]" in rendered
+    assert "[EMAIL]" in rendered
+    assert "+7 (000) 123-45-67" not in rendered
+    assert "synthetic@example.test" not in rendered
 
 
 @pytest.mark.parametrize(

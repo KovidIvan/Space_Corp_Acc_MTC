@@ -17,10 +17,11 @@ Last sync: Dev A (A2, A3, A4, router part of A6) and Dev B (B1–B7 editors) imp
   - `scripts/download_models.py`: Offline model downloader downloading faster-whisper and Silero VAD into `models/` for `make setup-voice`.
   - A4: `app/agent/llm_client.py` (`OllamaLLM` adapter using `SafeHttpClient` restricted to localhost), `prompts/nlu.ru.md` (Russian prompt for structured JSON extraction), `app/agent/nlu.py` (`understand_turn` with Ollama structured extraction and `rules_nlu` keyword fallback), and `app/agent/dialog.py` (`DialogSession` state machine, slot merging, re-ask limit <= 2, turn limit <= 8, polite closing).
   - A6 (partial): `app/agent/router.py` evaluating ordered `RoutingRule` priority (FR-05) and emergency handoff on `wants_human` / VIP (FR-06). `app/agent/summarizer.py` and `prompts/summary.ru.md` remain pending.
-- Current test suite: **120 passed, 7 skipped** (`python -m pytest -q`), 1 upstream Starlette/httpx deprecation warning (2026-10-07 test-call fix).
+- Current test suite: **126 passed, 7 skipped** (`python -m pytest -q`), 1 upstream Starlette/httpx deprecation warning (2026-10-07 logging and WebSocket diagnostics fix).
 - 2026-10-07 test-call fix: relative SQLite paths are resolved from the project root so starting from another working directory uses the same configured database; the setup-completion button now opens `/call` instead of opening and immediately closing a WebSocket probe. Added cwd-resolution and wizard UI regression tests. Full browser audio E2E remains untested.
+- 2026-10-07 logging and call gate fix: the PII filter preserves Uvicorn access-log interpolation args while masking text fields; missing setup/consent/config now returns a WebSocket protocol error frame without starting a call; Telegram polling logs a safe error category and stops retrying persistent auth/access/conflict failures. No real Telegram request was made.
 - `python -m compileall -q app tests`: passed.
-- `python -m ruff check app tests`: 33 lint errors reported workspace-wide; Ruff passes for Dev B modules. Five confirmed errors remain in Dev A's `app/agent/router.py` and `tests/test_agent.py`.
+- `python -m ruff check app tests`: passed workspace-wide on 2026-10-07.
 - `make` remains unavailable in this Windows PowerShell environment; Python module commands (`python -m ...`) are used.
 
 ## Task board
@@ -54,4 +55,4 @@ P2: FR-22 [ ] FR-23 [ ] FR-24 [ ] FR-25 [ ] FR-26 [ ] FR-27 [ ]
 - `scripts/bench.py` (A1) has not been run; hardware profile is not formally calibrated.
 - Telegram adapter was verified against mocked Bot API responses; live bot token and delivery in a real test call are pending.
 - `make` is unavailable on Windows PowerShell; documentation and scripts should use `python -m` commands where appropriate.
-- Ruff reports 33 workspace-wide lint errors; the Dev B modules checked in this session pass, and out-of-ownership errors remain unresolved.
+- No live Telegram polling or browser-driven audio E2E was run for the 2026-10-07 logging/WebSocket fix; retry with the user's local token and complete setup after reviewing the safe Telegram error category.

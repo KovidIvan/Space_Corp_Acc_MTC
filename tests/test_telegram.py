@@ -2,9 +2,11 @@
 
 import asyncio
 import hashlib
+import logging
 from datetime import UTC, datetime, timedelta
 
 import httpx
+import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -87,18 +89,70 @@ def test_telegram_api_errors_do_not_disclose_bot_token() -> None:
     def respond(_: httpx.Request) -> httpx.Response:
         return httpx.Response(500, text="failure")
 
-    async def run() -> str:
+    async def run() -> tuple[str, str]:
         client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
         bot = TelegramBotApi("secret-test-token", http=SafeHttpClient(client))
         try:
             await bot.bot_username()
         except TelegramApiError as error:
-            return str(error)
+            return str(error), error.category
         finally:
             await bot.close()
         raise AssertionError("Expected TelegramApiError")
 
-    assert "secret-test-token" not in asyncio.run(run())
+    message, category = asyncio.run(run())
+    assert "secret-test-token" not in message
+    assert category == "server_error"
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected_category"),
+    [(401, "unauthorized"), (403, "forbidden"), (409, "conflict"), (429, "rate_limited")],
+)
+def test_telegram_api_error_categories_are_safe(
+    status_code: int,
+    expected_category: str,
+) -> None:
+    def respond(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code, text="synthetic response details")
+
+    async def run() -> TelegramApiError:
+        client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+        bot = TelegramBotApi("secret-test-token", http=SafeHttpClient(client))
+        try:
+            await bot.get_updates(0)
+        except TelegramApiError as error:
+            return error
+        finally:
+            await bot.close()
+        raise AssertionError("Expected TelegramApiError")
+
+    error = asyncio.run(run())
+    assert error.category == expected_category
+    assert "secret-test-token" not in str(error)
+    assert "synthetic response details" not in str(error)
+
+
+def test_telegram_polling_logs_safe_category_and_stops_on_auth_failure(
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    channel = TelegramChannel("secret-test-token", session_factory=_session_factory())
+
+    async def reject_token(_: int) -> list[dict[str, object]]:
+        raise TelegramApiError("Telegram API request failed", category="unauthorized")
+
+    monkeypatch.setattr(channel.bot, "get_updates", reject_token)
+
+    async def run() -> None:
+        await channel._poll_updates()
+        await channel.close()
+
+    with caplog.at_level(logging.WARNING, logger="app.channels.telegram"):
+        asyncio.run(run())
+
+    assert "Telegram update polling failed (unauthorized)" in caplog.text
+    assert "secret-test-token" not in caplog.text
 
 
 def test_notice_is_minimal_masked_and_includes_mark_handled_button() -> None:
