@@ -9,6 +9,8 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 
 class Base(DeclarativeBase):
     """Base class for application ORM models."""
@@ -20,7 +22,7 @@ def _create_engine(database_url: str) -> Engine:
     if is_sqlite and url.database not in {None, ":memory:"}:
         database_path = Path(url.database)
         if not database_path.is_absolute():
-            database_path = Path(__file__).resolve().parents[2] / database_path
+            database_path = PROJECT_ROOT / database_path
         database_path = database_path.resolve()
         database_path.parent.mkdir(parents=True, exist_ok=True)
         url = url.set(database=str(database_path))

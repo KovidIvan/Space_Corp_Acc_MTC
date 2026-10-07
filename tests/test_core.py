@@ -6,13 +6,18 @@ from pathlib import Path
 import httpx
 import pytest
 from cryptography.fernet import Fernet, InvalidToken
+from sqlalchemy import select
+from sqlalchemy.orm import sessionmaker
 from uvicorn.logging import AccessFormatter
 
+from app.core import db as database
 from app.core.audit import create_audit_event, verify_chain
+from app.core.bootstrap import ensure_owner_account
 from app.core.config import Settings
 from app.core.logging import PiiMaskFilter, mask_pii
 from app.core.safe_http import SafeHttpClient, is_allowed_url, validate_outbound_url
 from app.core.security import decrypt_text, encrypt_text, hash_password, verify_password
+from app.models import Owner
 
 
 def test_mask_pii_covers_phone_email_and_long_digit_runs() -> None:
@@ -34,11 +39,11 @@ def test_pii_log_filter_renders_and_masks_format_arguments() -> None:
     assert "+79991234567" not in record.getMessage()
 
 
-def test_pii_log_filter_preserves_uvicorn_access_record_arguments() -> None:
+def test_pii_log_filter_preserves_uvicorn_access_formatter_arguments() -> None:
     record = logging.LogRecord(
         "uvicorn.access",
         logging.INFO,
-        "server.py",
+        "uvicorn/protocols/http/h11_impl.py",
         1,
         '%s - "%s %s HTTP/%s" %d',
         ("+7 (000) 123-45-67", "GET", "/call?email=synthetic@example.test", "1.1", 200),
@@ -46,13 +51,17 @@ def test_pii_log_filter_preserves_uvicorn_access_record_arguments() -> None:
     )
 
     assert PiiMaskFilter().filter(record)
-    rendered = AccessFormatter("%(message)s").format(record)
+    rendered = AccessFormatter(
+        '%(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
+        use_colors=False,
+    ).format(record)
 
-    assert len(record.args) == 5
-    assert "[PHONE]" in rendered
-    assert "[EMAIL]" in rendered
     assert "+7 (000) 123-45-67" not in rendered
     assert "synthetic@example.test" not in rendered
+    assert "[PHONE]" in rendered
+    assert "[EMAIL]" in rendered
+    assert record.msg == '%s - "%s %s HTTP/%s" %d'
+    assert len(record.args) == 5
 
 
 @pytest.mark.parametrize(
@@ -132,6 +141,43 @@ def test_settings_load_dotenv_from_project_root_independent_of_working_directory
     expected_env_file = Path(__file__).resolve().parents[1] / ".env"
 
     assert Settings.model_config["env_file"] == expected_env_file
+
+
+def test_relative_sqlite_database_is_shared_across_working_directories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_root = tmp_path / "project"
+    first_cwd = tmp_path / "first-cwd"
+    second_cwd = tmp_path / "second-cwd"
+    first_cwd.mkdir()
+    second_cwd.mkdir()
+    monkeypatch.setattr(database, "PROJECT_ROOT", project_root)
+    runtime_settings = Settings(
+        _env_file=None,
+        owner_name="synthetic-owner",
+        owner_company="Synthetic Company",
+        owner_password="synthetic-test-password",
+    )
+
+    monkeypatch.chdir(first_cwd)
+    first_engine = database._create_engine("sqlite:///./data/accounts.db")
+    database.init_db(first_engine)
+    with sessionmaker(bind=first_engine)() as db_session:
+        first_owner = ensure_owner_account(db_session, runtime_settings)
+        owner_id = first_owner.id
+
+    monkeypatch.chdir(second_cwd)
+    second_engine = database._create_engine("sqlite:///./data/accounts.db")
+    with sessionmaker(bind=second_engine)() as db_session:
+        second_owner = db_session.scalar(select(Owner).where(Owner.id == owner_id))
+
+    assert first_engine.url.database == second_engine.url.database
+    assert Path(first_engine.url.database) == project_root / "data" / "accounts.db"
+    assert second_owner is not None
+    assert second_owner.name == runtime_settings.owner_name
+    assert verify_password("synthetic-test-password", second_owner.password_hash)
+    first_engine.dispose()
+    second_engine.dispose()
 
 
 def test_settings_parse_dotenv_values_without_exposing_them(tmp_path: Path) -> None:

@@ -2,6 +2,7 @@
 
 import logging
 import re
+from collections.abc import Mapping
 
 EMAIL_PATTERN = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 PHONE_PATTERN = re.compile(r"(?<!\w)\+?\d[\d().\s-]{5,}\d(?!\w)")
@@ -23,19 +24,27 @@ def mask_pii(value: str) -> str:
     return LONG_DIGIT_PATTERN.sub("[DIGITS]", masked)
 
 
+def _mask_log_value(value: object) -> object:
+    """Mask strings while retaining containers and their structure for formatters."""
+    if isinstance(value, str):
+        return mask_pii(value)
+    if isinstance(value, tuple):
+        return tuple(_mask_log_value(item) for item in value)
+    if isinstance(value, list):
+        return [_mask_log_value(item) for item in value]
+    if isinstance(value, Mapping):
+        return {key: _mask_log_value(item) for key, item in value.items()}
+    return value
+
+
 class PiiMaskFilter(logging.Filter):
-    """Mask PII in the rendered log message before it reaches a handler."""
+    """Mask PII without changing the message arguments expected by formatters."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         """Sanitize a log record in place and allow it to be emitted."""
-        if record.name == "uvicorn.access" and isinstance(record.args, tuple):
-            if isinstance(record.msg, str):
-                record.msg = mask_pii(record.msg)
-            record.args = tuple(mask_pii(value) if isinstance(value, str) else value for value in record.args)
-            return True
-
-        record.msg = mask_pii(record.getMessage())
-        record.args = ()
+        if isinstance(record.msg, str):
+            record.msg = mask_pii(record.msg)
+        record.args = _mask_log_value(record.args)
         return True
 
 
