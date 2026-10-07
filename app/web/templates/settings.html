@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Сценарий и правила{% endblock %}
+{% block content %}
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Настройки ассистента</p>
+        <h1>Сценарий и правила</h1>
+        <p class="muted">Версия {{ config_version }}. Изменения будут сохранены новой версией.</p>
+    </div>
+    <a class="button button-secondary" href="/setup">Мастер настройки</a>
+</section>
+<section class="panel editor-panel">
+    <form id="settings-editor" data-config-version="{{ config_version }}">
+        <section class="editor-section">
+            <p class="eyebrow">Сценарий общения</p>
+            <h2>Фразы ассистента</h2>
+            <div class="form-stack">
+                <label for="editor-greeting">Приветствие</label>
+                <textarea id="editor-greeting" name="greeting" rows="3" maxlength="2000" required></textarea>
+                <label for="editor-disclosure">Уведомление об ИИ и обработке звонка</label>
+                <textarea id="editor-disclosure" name="disclosure" rows="3" maxlength="2000" required></textarea>
+                <p class="muted">Это уведомление обязательно и будет воспроизводиться в начале каждого звонка.</p>
+                <label for="editor-closing">Завершение разговора</label>
+                <textarea id="editor-closing" name="closing" rows="2" maxlength="2000" required></textarea>
+            </div>
+        </section>
+        <section class="editor-section">
+            <div class="editor-section-heading">
+                <div>
+                    <p class="eyebrow">База ответов</p>
+                    <h2>FAQ</h2>
+                </div>
+                <button id="add-faq" class="button button-secondary" type="button">Добавить вопрос</button>
+            </div>
+            <div id="faq-list" class="editor-list"></div>
+        </section>
+        <section class="editor-section">
+            <div class="editor-section-heading">
+                <div>
+                    <p class="eyebrow">Маршрутизация</p>
+                    <h2>Правила обработки звонков</h2>
+                </div>
+                <button id="add-routing-rule" class="button button-secondary" type="button">Добавить правило</button>
+            </div>
+            <div id="routing-list" class="editor-list"></div>
+            <div class="form-stack editor-subsection">
+                <label for="handoff-number">Номер для передачи звонка</label>
+                <input id="handoff-number" name="handoff_number" type="tel" maxlength="40" required>
+                <p class="muted">Сохранённые VIP-контакты</p>
+                <div id="vip-list" class="editor-list"></div>
+                <label for="vip-numbers">Добавить VIP-номера, по одному на строку</label>
+                <textarea id="vip-numbers" name="vip_numbers" rows="3" autocomplete="off"></textarea>
+                <p class="muted">VIP-номера хранятся только в виде хешей; существующие номера не показываются.</p>
+            </div>
+        </section>
+        <section class="editor-section">
+            <p class="eyebrow">Расписание</p>
+            <h2>Рабочие часы</h2>
+            <div class="form-stack">
+                <label for="working-timezone">Часовой пояс</label>
+                <input id="working-timezone" name="timezone" maxlength="100" required>
+                <div class="inline-fields">
+                    <label for="work-start">Начало работы<input id="work-start" name="work_start" type="time" required></label>
+                    <label for="work-end">Окончание работы<input id="work-end" name="work_end" type="time" required></label>
+                </div>
+                <fieldset class="day-picker">
+                    <legend>Рабочие дни</legend>
+                    {% for day, label in [(1, 'Пн'), (2, 'Вт'), (3, 'Ср'), (4, 'Чт'), (5, 'Пт'), (6, 'Сб'), (7, 'Вс')] %}
+                    <label><input type="checkbox" name="working_days" value="{{ day }}">{{ label }}</label>
+                    {% endfor %}
+                </fieldset>
+            </div>
+        </section>
+        <div id="editor-message" class="notice" role="status" aria-live="polite" hidden></div>
+        <div class="editor-actions">
+            <span class="muted">Сохранение добавит запись в журнал аудита.</span>
+            <button id="save-settings" class="button button-primary" type="submit">Сохранить изменения</button>
+        </div>
+    </form>
+</section>
+<script id="editor-config" type="application/json">{{ config|tojson }}</script>
+<script src="/static/settings_editor.js" defer></script>
+{% endblock %}

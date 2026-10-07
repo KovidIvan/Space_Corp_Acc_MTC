@@ -6,12 +6,14 @@ from typing import Annotated
 from cryptography.fernet import InvalidToken
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.calls import _call_query
 from app.core.audit import record_audit_event
 from app.core.db import get_db
 from app.core.security import decrypt_text
+from app.models import AgentConfig as AgentConfigRecord
 from app.models import CallRecord, Owner
 
 router = APIRouter(tags=["dashboard"])
@@ -166,5 +168,32 @@ def call_detail(
             "intent_labels": INTENT_LABELS,
             "urgency_labels": URGENCY_LABELS,
             "action_labels": ACTION_LABELS,
+        },
+    )
+
+
+@router.get("/settings", response_class=HTMLResponse, include_in_schema=False)
+def settings_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> Response:
+    """Render authenticated scenario and routing editors for the active config."""
+    owner = _owner_or_login(request, db)
+    if isinstance(owner, RedirectResponse):
+        return owner
+    config = db.scalar(select(AgentConfigRecord).order_by(AgentConfigRecord.version.desc()).limit(1))
+    if config is None:
+        return RedirectResponse("/setup", status_code=status.HTTP_303_SEE_OTHER)
+
+    record_audit_event(db, owner.id, "view", "agent_config", {"version": config.version})
+    db.commit()
+    return request.app.state.templates.TemplateResponse(
+        request=request,
+        name="settings.html",
+        context={
+            "request": request,
+            "owner": owner,
+            "config": config.config_json,
+            "config_version": config.version,
         },
     )

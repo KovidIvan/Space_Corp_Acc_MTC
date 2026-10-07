@@ -26,7 +26,7 @@
         {% if transcript %}
         <div class="transcript">
             {% for segment in transcript %}
-            <article class="transcript-segment">
+            <article class="transcript-segment segment-{{ segment.who }}">
                 <span class="speaker">{{ 'Звонивший' if segment.who == 'caller' else 'Ассистент' }}</span>
                 <p>
                 {% if segment.words %}

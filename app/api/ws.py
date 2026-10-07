@@ -1,4 +1,4 @@
-"""WebSocket call-start consent gate."""
+"""WebSocket call-start consent gate and session dispatcher."""
 
 from fastapi import APIRouter, WebSocket
 from sqlalchemy import select
@@ -26,4 +26,7 @@ async def call(websocket: WebSocket) -> None:
         return
 
     await websocket.accept()
-    await websocket.close(code=1013, reason="Voice call processing is not available")
+    from app.voice.session import CallSession
+
+    session = CallSession(websocket)
+    await session.run()
