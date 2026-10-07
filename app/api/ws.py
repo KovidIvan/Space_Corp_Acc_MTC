@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.core import db as database
 from app.core.consent import has_current_owner_consent
 from app.models import AgentConfig as AgentConfigRecord
+from app.voice.session import CallSession
 
 router = APIRouter(prefix="/ws", tags=["websocket"])
 
@@ -26,4 +27,5 @@ async def call(websocket: WebSocket) -> None:
         return
 
     await websocket.accept()
-    await websocket.close(code=1013, reason="Voice call processing is not available")
+    session = CallSession(websocket)
+    await session.run()

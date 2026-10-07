@@ -6,8 +6,6 @@ from pathlib import Path
 
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker
-from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
-from pydantic import ValidationError as PydanticValidationError
 
 from app.schemas import AgentConfig, CallResult
 

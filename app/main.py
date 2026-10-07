@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -16,6 +17,7 @@ from app.core import db as database
 from app.core.bootstrap import ensure_owner_account
 from app.core.config import Settings, settings
 from app.core.demo_data import seed_demo_calls
+from app.core.logging import PiiMaskFilter
 
 WEB_DIR = Path(__file__).parent / "web"
 TEMPLATES_DIR = WEB_DIR / "templates"
@@ -46,6 +48,11 @@ def create_app(runtime_settings: Settings = settings) -> FastAPI:
 
     application = FastAPI(title="Локальный помощник звонков", lifespan=lifespan)
     application.state.settings = runtime_settings
+
+    # Attach PII mask filter to all logging handlers (Hard Rule #5: No PII in logs)
+    pii_filter = PiiMaskFilter()
+    for handler in logging.root.handlers:
+        handler.addFilter(pii_filter)
     telegram_token = runtime_settings.telegram_bot_token
     application.state.telegram_channel = (
         TelegramChannel(telegram_token.get_secret_value(), session_factory=database.SessionLocal)
