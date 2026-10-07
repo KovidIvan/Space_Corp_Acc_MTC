@@ -196,6 +196,47 @@ def test_settings_parse_dotenv_values_without_exposing_them(tmp_path: Path) -> N
     assert settings.dashboard_configured
 
 
+
+
+def test_dashboard_configured_validates_nonempty_trimmed_values(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+
+    # Empty and whitespace-only values should not pass configuration check
+    env_file.write_text(
+        "OWNER_NAME=  \n"
+        "OWNER_COMPANY=Test Company\n"
+        "OWNER_PASSWORD=test-password\n"
+        "SESSION_SECRET=test-secret\n"
+        "DATA_ENCRYPTION_KEY=test-key\n",
+        encoding="utf-8",
+    )
+    settings = Settings(_env_file=env_file)
+    assert not settings.dashboard_configured, "Should reject whitespace-only OWNER_NAME"
+
+    env_file.write_text(
+        "OWNER_NAME=Test Owner\n"
+        "OWNER_COMPANY=\n"
+        "OWNER_PASSWORD=test-password\n"
+        "SESSION_SECRET=test-secret\n"
+        "DATA_ENCRYPTION_KEY=test-key\n",
+        encoding="utf-8",
+    )
+    settings = Settings(_env_file=env_file)
+    assert not settings.dashboard_configured, "Should reject empty OWNER_COMPANY"
+
+    # All properly filled values should pass
+    env_file.write_text(
+        "OWNER_NAME=Test Owner\n"
+        "OWNER_COMPANY=Test Company\n"
+        "OWNER_PASSWORD=test-password\n"
+        "SESSION_SECRET=test-secret\n"
+        "DATA_ENCRYPTION_KEY=test-key\n",
+        encoding="utf-8",
+    )
+    settings = Settings(_env_file=env_file)
+    assert settings.dashboard_configured, "Should accept all properly filled values"
+
+
 def test_audit_hash_chain_detects_tampering_and_link_breaks() -> None:
     first = create_audit_event({"actor": "owner", "action": "view", "target": "call-1"})
     second = create_audit_event(

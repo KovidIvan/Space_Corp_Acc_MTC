@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -33,6 +33,25 @@ class Settings(BaseSettings):
     owner_company: str | None = None
     owner_password: SecretStr | None = None
     telegram_bot_token: SecretStr | None = None
+
+    @field_validator("owner_name", "owner_company", mode="before")
+    @classmethod
+    def strip_strings(cls, v: str | None) -> str | None:
+        """Strip whitespace from string settings."""
+        if isinstance(v, str):
+            return v.strip() or None
+        return v
+
+    @field_validator("data_encryption_key", "session_secret", "owner_password", "telegram_bot_token", mode="before")
+    @classmethod
+    def strip_secret_strings(cls, v: SecretStr | None) -> SecretStr | None:
+        """Strip whitespace from secret string settings and convert to SecretStr."""
+        if isinstance(v, str):
+            stripped = v.strip()
+            return SecretStr(stripped) if stripped else None
+        if isinstance(v, SecretStr):
+            return v
+        return v
 
     @property
     def dashboard_configured(self) -> bool:
