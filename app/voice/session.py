@@ -13,14 +13,15 @@ Architecture (§4 Call flow, contracts/ws_protocol.md v1):
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
 import logging
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from uuid import uuid4
 
 from fastapi import WebSocket, WebSocketDisconnect
-import httpx
+from httpx import HTTPError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -29,12 +30,13 @@ from app.agent.llm_client import OllamaLLM
 from app.agent.nlu import TurnUnderstanding, understand_turn
 from app.agent.router import route
 from app.agent.summarizer import summarize_call
-from app.core.config import Settings, settings as global_settings
+from app.core.config import Settings
+from app.core.config import settings as global_settings
 from app.core.consent import has_current_owner_consent
 from app.core.db import SessionLocal
 from app.core.safe_http import SafeHttpClient
 from app.core.security import hash_vip_number
-from app.interfaces import LLM, STT, TTS, FakeLLM, FakeSTT, FakeTTS, Transcript, Word
+from app.interfaces import LLM, STT, TTS, FakeLLM, FakeSTT
 from app.models import AgentConfig as AgentConfigRecord
 from app.schemas import (
     AgentConfig,
@@ -45,12 +47,11 @@ from app.schemas import (
     TranscriptSegment,
     TranscriptWord,
 )
-from app.voice.phrases_cache import PhrasesCache
+from app.voice.phrases_cache import PhrasesCache, opening_phrases
 from app.voice.protocol import (
     ClientEnd,
     ClientStart,
     ClientTestAudio,
-    ServerChatOffer,
     ServerEnd,
     ServerError,
     ServerHandoff,
@@ -131,8 +132,8 @@ class CallSession:
             if whisper_path.exists():
                 try:
                     self._stt = FasterWhisperSTT(model_path=whisper_path)
-                except Exception as exc:
-                    logger.warning("Failed to initialize FasterWhisperSTT: %s", exc)
+                except (ImportError, OSError, RuntimeError, ValueError):
+                    logger.warning("Failed to initialize FasterWhisperSTT")
                     self._stt = FakeSTT()
             else:
                 self._stt = FakeSTT()
@@ -140,8 +141,8 @@ class CallSession:
         if self._vad is None:
             try:
                 self._vad = SileroVAD()
-            except Exception as exc:
-                logger.warning("Failed to initialize SileroVAD: %s", exc)
+            except (ImportError, OSError, RuntimeError, ValueError):
+                logger.warning("Failed to initialize SileroVAD")
                 # Fallback simple energy probability function
                 self._vad = lambda pcm, sr: 0.8 if any(pcm) else 0.0
 
@@ -170,14 +171,14 @@ class CallSession:
             await self._run_call_flow()
         except WebSocketDisconnect:
             logger.info("Call %s disconnected by client", self.call_id)
-        except Exception as exc:
-            logger.exception("Error in call session %s: %s", self.call_id, exc)
+        except Exception:  # noqa: BLE001
+            logger.error("Error in call session %s", self.call_id)
             try:
                 await self.websocket.send_text(
                     ServerError(code="internal", message="Внутренняя ошибка сервиса").model_dump_json()
                 )
-            except Exception:
-                pass
+            except (WebSocketDisconnect, RuntimeError):
+                logger.debug("Could not send the internal-error frame")
         finally:
             async with _ACTIVE_CALLS_LOCK:
                 _ACTIVE_CALLS.discard(self.call_id)
@@ -218,7 +219,7 @@ class CallSession:
                 await self.websocket.close(code=1003, reason="Expected start message")
                 return
             caller_raw = parsed_start.caller_number
-        except (asyncio.TimeoutError, WebSocketDisconnect):
+        except (TimeoutError, WebSocketDisconnect):
             await self.websocket.close(code=1002, reason="Start handshake timeout")
             return
 
@@ -235,7 +236,8 @@ class CallSession:
 
         # 5. Mandatory Opening: Greeting + Disclosure (FR-02)
         await self.websocket.send_text(ServerState(state="GREET").model_dump_json())
-        greeting_text = f"{self.config.greeting} {self.config.disclosure}"
+        greeting, disclosure = opening_phrases(self.config)
+        greeting_text = f"{greeting} {disclosure}"
         await self.websocket.send_text(
             ServerTranscript(who="agent", text=greeting_text).model_dump_json()
         )
@@ -244,7 +246,8 @@ class CallSession:
         )
 
         await self._send_playback_audio(
-            self._phrases_cache.get("greeting") + self._phrases_cache.get("disclosure")
+            self._phrases_cache.get("greeting", greeting)
+            + self._phrases_cache.get("disclosure", disclosure)
         )
 
         # Transition dialog to ASK_NAME_COMPANY
@@ -259,7 +262,7 @@ class CallSession:
             try:
                 # 30-second idle timeout without speech (FR-03 / contracts)
                 message = await asyncio.wait_for(self.websocket.receive(), timeout=30.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 end_reason = "timeout"
                 close_phrase = "К сожалению, вас не слышно. Я завершаю звонок. Всего доброго!"
                 await self._say_agent_phrase(close_phrase)
@@ -270,8 +273,7 @@ class CallSession:
                 break
 
             # Handle binary audio frame from caller
-            if "bytes" in message and message["bytes"]:
-                pcm_chunk = message["bytes"]
+            if pcm_chunk := message.get("bytes"):
                 utterances = segmenter.feed(pcm_chunk)
                 terminated = False
                 for utterance in utterances:
@@ -283,8 +285,8 @@ class CallSession:
                     break
 
             # Handle text control frame
-            elif "text" in message and message["text"]:
-                parsed = parse_client_message(message["text"])
+            elif text_frame := message.get("text"):
+                parsed = parse_client_message(text_frame)
                 if isinstance(parsed, ClientEnd):
                     end_reason = "completed"
                     break
@@ -304,16 +306,19 @@ class CallSession:
         if not text:
             return False
 
+        # NLU Turn Understanding
+        turn = await understand_turn(text, llm=self._llm, mode=self.settings.nlu_mode)
+        self.last_turn = turn
+        if turn.no_record:
+            self.dialog.update_slots(turn)
+            return await self._finish_no_record_call()
+
         # Caller transcript frame
         await self.websocket.send_text(ServerTranscript(who="caller", text=text).model_dump_json())
         words = [TranscriptWord(w=item.w, p=item.p) for item in transcript_obj.words]
         self.transcript_segments.append(
             TranscriptSegment(who="caller", text=text, words=words)
         )
-
-        # NLU Turn Understanding
-        turn = await understand_turn(text, llm=self._llm, mode=self.settings.nlu_mode)
-        self.last_turn = turn
 
         # Router rule evaluation
         routed_action = route(
@@ -354,12 +359,6 @@ class CallSession:
                 ).model_dump_json()
             )
 
-        # Offer chat notification
-        if turn_result.action == "offer_chat":
-            await self.websocket.send_text(
-                ServerChatOffer(deep_link=f"https://t.me/callassistant_bot?start={self.call_id}").model_dump_json()
-            )
-
         # Agent response speech
         await self._say_agent_phrase(turn_result.agent_phrase)
         return turn_result.is_terminal
@@ -375,11 +374,14 @@ class CallSession:
             text = "Здравствуйте! Хочу уточнить ваш график работы и адрес офиса."
 
         # Simulate caller speech from fixture text
-        await self.websocket.send_text(ServerTranscript(who="caller", text=text).model_dump_json())
-        self.transcript_segments.append(TranscriptSegment(who="caller", text=text))
-
         turn = await understand_turn(text, llm=self._llm, mode=self.settings.nlu_mode)
         self.last_turn = turn
+        if turn.no_record:
+            self.dialog.update_slots(turn)
+            return await self._finish_no_record_call()
+
+        await self.websocket.send_text(ServerTranscript(who="caller", text=text).model_dump_json())
+        self.transcript_segments.append(TranscriptSegment(who="caller", text=text))
 
         routed_action = route(
             rules=self.config.routing or [],
@@ -406,10 +408,22 @@ class CallSession:
         await self._say_agent_phrase(turn_result.agent_phrase)
         return turn_result.is_terminal
 
+    async def _finish_no_record_call(self) -> bool:
+        """End a call without retaining its transcript or caller-provided details."""
+        callback_number = self.dialog.slots.callback_number
+        self.dialog.slots = CallSlots(callback_number=callback_number)
+        self.transcript_segments.clear()
+        await self.websocket.send_text(ServerState(state=DialogState.CLOSE.value).model_dump_json())
+        await self._say_agent_phrase(
+            "Понимаю. Содержание разговора не будет сохранено. Всего доброго."
+        )
+        return True
+
     async def _say_agent_phrase(self, phrase: str) -> None:
         """Send agent transcript, playback start, audio frames, and playback stop."""
         await self.websocket.send_text(ServerTranscript(who="agent", text=phrase).model_dump_json())
-        self.transcript_segments.append(TranscriptSegment(who="agent", text=phrase))
+        if not self.dialog.no_record:
+            self.transcript_segments.append(TranscriptSegment(who="agent", text=phrase))
         audio = self._tts.synth(phrase)
         await self._send_playback_audio(audio)
 
@@ -429,15 +443,21 @@ class CallSession:
         ended_at = datetime.now(UTC)
         duration_s = max(0.0, round((ended_at - self.started_at).total_seconds(), 2))
 
-        summary_ru = await summarize_call(
-            self.transcript_segments,
-            self.dialog.slots,
-            llm=self._llm,
-        )
+        if self.dialog.no_record:
+            self.transcript_segments.clear()
+            slots = CallSlots(callback_number=self.dialog.slots.callback_number)
+            summary_ru = ""
+        else:
+            slots = self.dialog.slots
+            summary_ru = await summarize_call(
+                self.transcript_segments,
+                slots,
+                llm=self._llm,
+            )
 
-        # Fallback slots callback number to caller number if left blank
-        if not self.dialog.slots.callback_number and self.caller_masked != "+*** ***-**-**":
-            self.dialog.slots.callback_number = self.caller_masked
+            # Fallback slots callback number to caller number if left blank
+            if not slots.callback_number and self.caller_masked != "+*** ***-**-**":
+                slots.callback_number = self.caller_masked
 
         call_result = CallResult(
             call_id=self.call_id,
@@ -452,7 +472,7 @@ class CallSession:
             transcript=self.transcript_segments,
             intent=self.last_turn.intent if self.last_turn else "unclear",
             urgency=self.last_turn.urgency if self.last_turn else "normal",
-            slots=self.dialog.slots,
+            slots=slots,
             summary_ru=summary_ru,
             action=self.dialog.chosen_action or "take_message",
             handoff=Handoff(performed=True, reason=self.handoff_reason)
@@ -467,8 +487,8 @@ class CallSession:
                 ServerEnd(call_id=self.call_id, reason=reason).model_dump_json()
             )
             await self.websocket.close(code=1000, reason="Call ended")
-        except Exception:
-            pass
+        except (WebSocketDisconnect, RuntimeError):
+            logger.debug("Client disconnected before call completion")
 
         # Ingest CallResult to Dev B's loopback endpoint
         await self._ingest_call_result(call_result)
@@ -487,12 +507,8 @@ class CallSession:
             if response.status_code in (200, 201):
                 logger.info("Successfully ingested CallResult %s", result.call_id)
             else:
-                logger.warning(
-                    "CallResult ingest returned status %s: %s",
-                    response.status_code,
-                    response.text,
-                )
-        except Exception as exc:
-            logger.warning("Failed to POST CallResult to %s: %s", self.ingest_url, exc)
+                logger.warning("CallResult ingest returned status %s", response.status_code)
+        except (HTTPError, ValueError):
+            logger.warning("Failed to POST CallResult")
         finally:
             await client.aclose()

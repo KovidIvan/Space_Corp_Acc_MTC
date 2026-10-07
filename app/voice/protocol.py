@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProtocolMessage(BaseModel):
@@ -25,8 +25,8 @@ class ProtocolMessage(BaseModel):
 
 class ClientStart(ProtocolMessage):
     type: Literal["start"] = "start"
-    caller_number: str = "+375000000000"
-    protocol: int = 1
+    caller_number: str = Field(min_length=1)
+    protocol: Literal[1]
 
 
 class ClientEnd(ProtocolMessage):
@@ -97,5 +97,5 @@ def parse_client_message(
         if msg_type == "test_audio":
             return ClientTestAudio.model_validate(data)
         return None
-    except Exception:
+    except (ValueError, TypeError):
         return None

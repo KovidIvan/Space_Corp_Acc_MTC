@@ -6,6 +6,7 @@ let micStream = null;
 let processorNode = null;
 let isCallActive = false;
 let nextPlayTime = 0;
+let pendingPcmSamples = new Int16Array(0);
 
 const btnCall = document.getElementById("btn-call");
 const btnHangup = document.getElementById("btn-hangup");
@@ -146,7 +147,7 @@ function handleControlMessage(msg) {
       break;
 
     case "chat_offer":
-      chatOfferText.innerHTML = `Ассистент предложил перейти в чат: <a href="${msg.deep_link}" target="_blank" style="color:inherit; font-weight:bold;">${msg.deep_link}</a>`;
+      chatOfferText.textContent = "Внешний чат недоступен в локальном режиме.";
       alertChatOffer.classList.add("show");
       break;
 
@@ -166,6 +167,11 @@ function handleControlMessage(msg) {
 
 async function initMicrophone() {
   audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  if (audioContext.sampleRate !== 16000) {
+    await audioContext.close();
+    audioContext = null;
+    throw new Error("16 kHz audio is required");
+  }
   nextPlayTime = audioContext.currentTime;
 
   micStream = await navigator.mediaDevices.getUserMedia({
@@ -178,7 +184,7 @@ async function initMicrophone() {
   });
 
   const source = audioContext.createMediaStreamSource(micStream);
-  // Buffer size 512 samples (~32 ms at 16 kHz)
+  // Buffer callbacks are repacked into 320-sample (20 ms) wire frames.
   processorNode = audioContext.createScriptProcessor(512, 1, 1);
 
   processorNode.onaudioprocess = (event) => {
@@ -191,7 +197,15 @@ async function initMicrophone() {
       const s = Math.max(-1, Math.min(1, input[i]));
       pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
     }
-    socket.send(pcm16.buffer);
+    const merged = new Int16Array(pendingPcmSamples.length + pcm16.length);
+    merged.set(pendingPcmSamples);
+    merged.set(pcm16, pendingPcmSamples.length);
+    let offset = 0;
+    while (offset + 320 <= merged.length) {
+      socket.send(merged.slice(offset, offset + 320).buffer);
+      offset += 320;
+    }
+    pendingPcmSamples = merged.slice(offset);
   };
 
   source.connect(processorNode);
@@ -245,6 +259,7 @@ function sendTestAudio() {
 
 function cleanupCall() {
   isCallActive = false;
+  pendingPcmSamples = new Int16Array(0);
   btnCall.disabled = false;
   btnHangup.disabled = true;
   btnTest.disabled = true;

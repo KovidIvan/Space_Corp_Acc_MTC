@@ -84,18 +84,15 @@ class OllamaLLM:
         except ValueError:
             raise
         except Exception as exc:
-            raise RuntimeError(f"LLM request to {url} failed: {exc}") from exc
+            raise RuntimeError("LLM request failed") from exc
 
         if response.status_code != 200:
-            raise RuntimeError(
-                f"Ollama returned HTTP {response.status_code}: "
-                f"{response.text[:200]}"
-            )
+            raise RuntimeError(f"Ollama returned HTTP {response.status_code}")
 
         try:
             body = response.json()
         except Exception as exc:
-            raise RuntimeError(f"Ollama response is not valid JSON: {exc}") from exc
+            raise RuntimeError("Ollama response is not valid JSON") from exc
 
         content = body.get("message", {}).get("content", "")
         if not content:
@@ -104,12 +101,10 @@ class OllamaLLM:
         try:
             result = json.loads(content)
         except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                f"LLM output is not valid JSON: {exc}; raw={content[:300]}"
-            ) from exc
+            raise RuntimeError("LLM output is not valid JSON") from exc
 
         if not isinstance(result, dict):
-            raise RuntimeError(f"LLM output is not a JSON object: {type(result)}")
+            raise TypeError("LLM output is not a JSON object")
 
         return result
 

@@ -73,7 +73,7 @@ async def summarize_call(
             summary = str(res.get("summary", "")).strip()
             if summary:
                 return summary
-        except Exception as exc:
-            logger.warning("LLM summarization failed, falling back to heuristics: %s", exc)
+        except (RuntimeError, ValueError, TypeError, TimeoutError, AttributeError):
+            logger.warning("LLM summarization failed, falling back to heuristics")
 
     return heuristic_summary(slots, transcript)

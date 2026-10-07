@@ -270,8 +270,8 @@ async def llm_nlu(text: str, llm: LLM) -> TurnUnderstanding:
     try:
         raw = await llm.json(system_prompt, text, _NLU_JSON_SCHEMA)
         return _parse_llm_response(raw)
-    except Exception:
-        logger.warning("LLM NLU failed, falling back to keyword rules", exc_info=True)
+    except (RuntimeError, ValueError, TypeError, TimeoutError):
+        logger.warning("LLM NLU failed, falling back to keyword rules")
         return rules_nlu(text)
 
 

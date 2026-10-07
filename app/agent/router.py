@@ -14,7 +14,7 @@ routing rule triggers ``handoff`` immediately.
 from __future__ import annotations
 
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 from app.agent.nlu import TurnUnderstanding
 from app.schemas import Action, RoutingRule
@@ -44,9 +44,7 @@ def _matches_rule(
         return False
     if when.wants_human is not None and when.wants_human != turn.wants_human:
         return False
-    if when.wants_chat is not None and when.wants_chat != turn.wants_chat:
-        return False
-    return True
+    return not (when.wants_chat is not None and when.wants_chat != turn.wants_chat)
 
 
 def route(
@@ -77,10 +75,9 @@ def route(
     if is_vip:
         # Check if there's a VIP-specific rule first
         for rule in sorted(rules, key=lambda r: r.priority):
-            if rule.when is not None and rule.when.is_vip is True:
-                if _matches_rule(rule, turn, is_vip=is_vip, outside_hours=outside_hours):
-                    logger.info("VIP matched rule %s → %s", rule.id, rule.action)
-                    return rule.action
+            if rule.when is not None and rule.when.is_vip is True and _matches_rule(rule, turn, is_vip=is_vip, outside_hours=outside_hours):
+                logger.info("VIP matched rule %s → %s", rule.id, rule.action)
+                return rule.action
         logger.info("VIP caller, no specific rule → handoff")
         return "handoff"
 

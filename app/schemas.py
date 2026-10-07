@@ -19,7 +19,7 @@ class ContractModel(BaseModel):
 class AgentOwner(ContractModel):
     name: str
     company: str
-    role: str = Field(default=None)
+    role: str | None = None
 
 
 class FAQItem(ContractModel):
@@ -35,26 +35,26 @@ class Example(ContractModel):
 
 
 class RuleWhen(ContractModel):
-    intent: list[Intent] = Field(default=None)
-    urgency: list[Urgency] = Field(default=None)
-    is_vip: bool = Field(default=None)
-    outside_hours: bool = Field(default=None)
-    wants_human: bool = Field(default=None)
-    wants_chat: bool = Field(default=None)
+    intent: list[Intent] | None = None
+    urgency: list[Urgency] | None = None
+    is_vip: bool | None = None
+    outside_hours: bool | None = None
+    wants_human: bool | None = None
+    wants_chat: bool | None = None
 
 
 class RoutingRule(ContractModel):
     id: str
     priority: int
     action: Action
-    when: RuleWhen = Field(default=None)
+    when: RuleWhen | None = None
 
 
 class WorkingHours(ContractModel):
-    tz: str = Field(default=None)
-    days: list[Annotated[int, Field(ge=1, le=7)]] = Field(default=None)
-    start: str = Field(default=None)
-    end: str = Field(default=None)
+    tz: str | None = None
+    days: list[Annotated[int, Field(ge=1, le=7)]] | None = None
+    start: str | None = None
+    end: str | None = None
 
 
 class AgentConfig(ContractModel):
@@ -65,11 +65,11 @@ class AgentConfig(ContractModel):
     closing: str
     routing: list[RoutingRule]
     handoff_number: str
-    template: str = Field(default=None)
-    faq: list[FAQItem] = Field(default=None)
-    examples: list[Example] = Field(default=None)
-    vip_numbers: list[str] = Field(default=None)
-    working_hours: WorkingHours = Field(default=None)
+    template: str | None = None
+    faq: list[FAQItem] | None = None
+    examples: list[Example] | None = None
+    vip_numbers: list[str] | None = None
+    working_hours: WorkingHours | None = None
     retention_days: int = Field(default=30, ge=0)
     store_audio: bool = False
     notice_detail: Literal["minimal", "names"] = "minimal"
@@ -77,8 +77,8 @@ class AgentConfig(ContractModel):
 
 class Caller(ContractModel):
     masked: str
-    hash: str = Field(default=None)
-    is_vip: bool = Field(default=None)
+    hash: str | None = None
+    is_vip: bool | None = None
 
 
 class TranscriptWord(ContractModel):
@@ -89,8 +89,8 @@ class TranscriptWord(ContractModel):
 class TranscriptSegment(ContractModel):
     who: Literal["caller", "agent"]
     text: str
-    start_s: float = Field(default=None)
-    words: list[TranscriptWord] = Field(default=None)
+    start_s: float | None = None
+    words: list[TranscriptWord] | None = None
 
 
 class CallSlots(ContractModel):
@@ -102,8 +102,8 @@ class CallSlots(ContractModel):
 
 
 class Handoff(ContractModel):
-    performed: bool = Field(default=None)
-    reason: str = Field(default=None)
+    performed: bool | None = None
+    reason: str | None = None
 
 
 class CallResult(ContractModel):
@@ -117,11 +117,11 @@ class CallResult(ContractModel):
     slots: CallSlots
     summary_ru: str
     action: Action
-    duration_s: float = Field(default=None)
-    handoff: Handoff = Field(default=None)
+    duration_s: float | None = None
+    handoff: Handoff | None = None
     no_record: bool = False
-    stt_avg_conf: float = Field(default=None)
-    latency_ms_p50: float = Field(default=None)
+    stt_avg_conf: float | None = None
+    latency_ms_p50: float | None = None
 
 
 class CallEdit(ContractModel):

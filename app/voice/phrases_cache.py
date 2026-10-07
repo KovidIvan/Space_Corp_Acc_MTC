@@ -20,6 +20,34 @@ DEFAULT_PHRASES = {
 }
 
 
+def opening_phrases(config: AgentConfig | None = None) -> tuple[str, str]:
+    """Return configured opening phrases with the mandatory identity and disclosure details."""
+    greeting = config.greeting.strip() if config and config.greeting.strip() else DEFAULT_PHRASES["greeting"]
+    disclosure = (
+        config.disclosure.strip()
+        if config and config.disclosure.strip()
+        else DEFAULT_PHRASES["disclosure"]
+    )
+
+    owner_name = config.owner.name.strip() if config else "Иван"
+    company = config.owner.company.strip() if config else ""
+    owner_name = owner_name or "Иван"
+    if owner_name.casefold() not in greeting.casefold():
+        greeting = f"{greeting.rstrip('. ')}. Меня зовут {owner_name}."
+    if company and company.casefold() not in greeting.casefold():
+        greeting = f"{greeting.rstrip('. ')}. Вы позвонили в компанию {company}."
+
+    opening = f"{greeting} {disclosure}".casefold()
+    if "ии" not in opening and "искусствен" not in opening:
+        disclosure = f"Я ИИ-ассистент. {disclosure}"
+    if "запис" not in opening:
+        disclosure = f"{disclosure.rstrip('. ')}. Разговор записывается."
+    if "обрабатыва" not in opening:
+        disclosure = f"{disclosure.rstrip('. ')}. Разговор обрабатывается локально."
+
+    return greeting, disclosure
+
+
 class PhrasesCache:
     """In-memory cache for pre-synthesized PCM16 audio phrases."""
 
@@ -31,10 +59,7 @@ class PhrasesCache:
         """Pre-synthesize all scenario static phrases."""
         phrases = dict(DEFAULT_PHRASES)
         if config is not None:
-            if config.greeting:
-                phrases["greeting"] = config.greeting
-            if config.disclosure:
-                phrases["disclosure"] = config.disclosure
+            phrases["greeting"], phrases["disclosure"] = opening_phrases(config)
             if config.closing:
                 phrases["closing"] = config.closing
 
@@ -42,14 +67,15 @@ class PhrasesCache:
             try:
                 self._cache[key] = self.tts.synth(text)
                 logger.info("Pre-synthesized cached phrase: %s", key)
-            except Exception as exc:
-                logger.warning("Failed to pre-synthesize phrase '%s': %s", key, exc)
+            except (RuntimeError, ValueError, OSError, ImportError):
+                logger.warning("Failed to pre-synthesize phrase '%s'", key)
                 self._cache[key] = b""
 
     def get(self, key: str, fallback_text: str = "") -> bytes:
         """Get pre-synthesized audio for *key*, or synthesize *fallback_text* on demand."""
-        if key in self._cache and self._cache[key]:
-            return self._cache[key]
+        cached = self._cache.get(key)
+        if cached:
+            return cached
 
         if fallback_text:
             return self.tts.synth(fallback_text)

@@ -6,7 +6,6 @@ These tests use only deterministic fakes — no real LLM or network calls.
 import pytest
 
 from app.agent.nlu import (
-    Slots,
     TurnUnderstanding,
     _parse_llm_response,
     rules_nlu,
@@ -15,7 +14,6 @@ from app.agent.nlu import (
 from app.agent.router import route
 from app.interfaces import FakeLLM
 from app.schemas import RoutingRule, RuleWhen
-
 
 # ───────────────────── Rules NLU: intent detection ─────────────────────
 

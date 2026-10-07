@@ -101,16 +101,19 @@ class DialogSession:
             )
 
         # 3. Handle silence / unclear speech re-asks (FR-03)
-        if turn.intent == "unclear" and not any([self.slots.name, self.slots.reason]):
-            if self.reask_count < self.max_reasks:
-                self.reask_count += 1
-                return DialogTurnResult(
-                    next_state=self.state,
-                    agent_phrase="Извините, плохо вас слышно. Повторите, пожалуйста, как к вам обращаться и цель звонка?",
-                    action=self.chosen_action,
-                    slots=self.slots,
-                    reask_count=self.reask_count,
-                )
+        if (
+            turn.intent == "unclear"
+            and not any([self.slots.name, self.slots.reason])
+            and self.reask_count < self.max_reasks
+        ):
+            self.reask_count += 1
+            return DialogTurnResult(
+                next_state=self.state,
+                agent_phrase="Извините, плохо вас слышно. Повторите, пожалуйста, как к вам обращаться и цель звонка?",
+                action=self.chosen_action,
+                slots=self.slots,
+                reask_count=self.reask_count,
+            )
 
         # 4. State transitions
         if self.state in (DialogState.GREET, DialogState.ASK_NAME_COMPANY):
@@ -144,7 +147,7 @@ class DialogSession:
                 phrase = "Спасибо за предложение, но в данный момент мы не заинтересованы. Всего доброго!"
             elif action == "offer_chat":
                 self.state = DialogState.OFFER_CHAT
-                phrase = "Я отправил ссылку на наш чат в Telegram. Вы можете продолжить переписку там."
+                phrase = "Внешний чат недоступен в локальном режиме. Я зафиксирую ваше обращение."
             elif action == "handoff":
                 self.state = DialogState.HANDOFF
                 phrase = "Переключаю вас на руководителя. Оставайтесь на линии."

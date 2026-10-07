@@ -68,8 +68,8 @@ class LocalTTS(TTS):
                 self.engine = "silero"
                 logger.info("Loaded Silero TTS model")
                 return
-            except Exception as exc:
-                logger.warning("Failed to load Silero model: %s", exc)
+            except (ImportError, OSError, RuntimeError, ValueError):
+                logger.warning("Failed to load Silero model")
 
         self.engine = "fallback"
 
@@ -87,8 +87,6 @@ class LocalTTS(TTS):
 
         if self._silero_model is not None:
             try:
-                import numpy as np
-
                 audio_tensor = self._silero_model.apply_tts(
                     text=text,
                     speaker="kseniya",
@@ -96,8 +94,8 @@ class LocalTTS(TTS):
                 )
                 audio_np = (audio_tensor.numpy() * 32767).astype("<i2")
                 return audio_np.tobytes()
-            except Exception as exc:
-                logger.error("Silero synthesis failed: %s", exc)
+            except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
+                logger.error("Silero synthesis failed")
 
         # Fallback for deterministic testing without voice models: return silent PCM padding matching text length
         num_samples = int(self.sample_rate * min(len(text) * 0.05, 3.0))
