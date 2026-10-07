@@ -17,7 +17,11 @@ from app.core import db as database
 from app.core.bootstrap import ensure_owner_account
 from app.core.config import Settings, settings
 from app.core.demo_data import seed_demo_calls
+<<<<<<< HEAD
 from app.core.logging import PiiMaskFilter
+=======
+from app.core.logging import install_pii_mask_filter
+>>>>>>> 34da9783c58be4a772b28c0903a9f8be978ea23a
 
 WEB_DIR = Path(__file__).parent / "web"
 TEMPLATES_DIR = WEB_DIR / "templates"
@@ -47,6 +51,7 @@ def create_app(runtime_settings: Settings = settings) -> FastAPI:
                 await telegram_channel.stop()
 
     application = FastAPI(title="Локальный помощник звонков", lifespan=lifespan)
+    install_pii_mask_filter()
     application.state.settings = runtime_settings
 
     # Attach PII mask filter to all logging handlers (Hard Rule #5: No PII in logs)

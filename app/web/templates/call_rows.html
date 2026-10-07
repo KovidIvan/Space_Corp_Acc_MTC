@@ -6,10 +6,10 @@
         {% for call in calls %}
             <tr>
                 <td>{{ call.started_at.strftime('%d.%m.%Y %H:%M') }}</td>
-                <td>{{ call.caller_masked or 'Не определён' }}</td>
-                <td>{{ intent_labels.get(call.intent, 'Не определён') }}</td>
+                <td data-label="Номер">{{ call.caller_masked or 'Не определён' }}</td>
+                <td data-label="Тип">{{ intent_labels.get(call.intent, 'Не определён') }}</td>
                 <td><span class="badge urgency-{{ call.urgency or 'unknown' }}">{{ urgency_labels.get(call.urgency, 'Не определена') }}</span></td>
-                <td>{{ 'Обработан' if call.handled else 'Новый' }}</td>
+                <td data-label="Статус"><span class="status {{ 'status-done' if call.handled else 'status-new' }}">{{ 'Обработан' if call.handled else 'Новый' }}</span></td>
                 <td><a class="text-link" href="/calls/{{ call.id }}">Открыть</a></td>
             </tr>
         {% endfor %}

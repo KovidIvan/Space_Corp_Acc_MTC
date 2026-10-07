@@ -93,6 +93,44 @@ def test_setup_requires_login_and_renders_five_steps(wizard_client: TestClient) 
         assert runs[0].seconds is None
 
 
+def test_settings_editor_requires_login_and_loads_saved_scenario(wizard_client: TestClient) -> None:
+    assert wizard_client.get("/settings", follow_redirects=False).status_code == 303
+    _login(wizard_client)
+    wizard_client.get("/setup")
+    completed = wizard_client.post(
+        "/api/wizard/complete",
+        json={"agent_config": _config(), "consent_accepted": True},
+    )
+    assert completed.status_code == 200
+
+    config = wizard_client.get("/api/config").json()
+    config["faq"] = [{"id": "synthetic-hours", "question": "Synthetic hours?", "answer": "Synthetic answer."}]
+    config["routing"] = [
+        {"id": "vip-priority", "priority": 1, "action": "handoff", "when": {"is_vip": True}},
+        {"id": "client-faq", "priority": 20, "action": "answer_faq", "when": {"intent": ["client"]}},
+        {"id": "default-message", "priority": 100, "action": "take_message"},
+    ]
+    config["working_hours"] = {
+        "tz": "Europe/Minsk",
+        "days": [1, 2, 3, 4, 5],
+        "start": "08:30",
+        "end": "17:30",
+    }
+    saved = wizard_client.put("/api/config", json=config)
+    assert saved.status_code == 200
+    assert saved.json()["faq"][0]["id"] == "synthetic-hours"
+    assert saved.json()["routing"][0]["priority"] == 1
+    assert saved.json()["working_hours"]["start"] == "08:30"
+    assert saved.json()["vip_numbers"] == config["vip_numbers"]
+
+    editor = wizard_client.get("/settings")
+    assert editor.status_code == 200
+    assert "Synthetic hours?" in editor.text
+    assert "Уведомление об ИИ и обработке звонка" in editor.text
+    assert "+375 (29) 123-45-67" not in editor.text
+    assert wizard_client.get("/static/settings_editor.js").status_code == 200
+
+
 def test_telegram_link_requires_login_and_issues_short_lived_deep_link(wizard_client: TestClient) -> None:
     assert wizard_client.get("/api/wizard/telegram-link").status_code == 401
     _login(wizard_client)
@@ -130,7 +168,10 @@ def test_websocket_call_is_rejected_without_current_consent(wizard_client: TestC
     assert disconnected.value.code == 1008
 
 
-def test_consent_config_timer_and_websocket_guard(wizard_client: TestClient) -> None:
+def test_consent_config_timer_and_websocket_guard(
+    wizard_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _login(wizard_client)
     assert wizard_client.get("/setup").status_code == 200
     payload = {"agent_config": _config(), "consent_accepted": False}
@@ -190,6 +231,7 @@ def test_consent_config_timer_and_websocket_guard(wizard_client: TestClient) -> 
     assert removed_latest.status_code == 200
     assert wizard_client.get("/api/config").json()["version"] == 1
 
+<<<<<<< HEAD
     # After config deletion, no config exists so /ws/call endpoint should close  
     try:
         with wizard_client.websocket_connect("/ws/call") as websocket:
@@ -197,6 +239,21 @@ def test_consent_config_timer_and_websocket_guard(wizard_client: TestClient) -> 
             websocket.receive_text()  # This should timeout or raise
     except WebSocketDisconnect:
         pass  # Expected: config was deleted, connection rejected
+=======
+    from app.voice.session import CallSession
+
+    session_calls: list[bool] = []
+
+    async def fake_run(session: CallSession) -> None:
+        session_calls.append(True)
+        await session.websocket.send_text("session-started")
+        await session.websocket.close(code=1000)
+
+    monkeypatch.setattr(CallSession, "run", fake_run)
+    with wizard_client.websocket_connect("/ws/call") as websocket:
+        assert websocket.receive_text() == "session-started"
+    assert session_calls == [True]
+>>>>>>> 34da9783c58be4a772b28c0903a9f8be978ea23a
 
     assert wizard_client.delete("/api/config/1").status_code == 200
     assert wizard_client.get("/api/config").status_code == 404

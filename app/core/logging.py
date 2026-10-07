@@ -31,3 +31,20 @@ class PiiMaskFilter(logging.Filter):
         record.msg = mask_pii(record.getMessage())
         record.args = ()
         return True
+
+
+def install_pii_mask_filter() -> None:
+    """Attach the PII filter to all handlers configured in the current process."""
+    loggers = [logging.getLogger()]
+    loggers.extend(
+        logger
+        for logger in logging.root.manager.loggerDict.values()
+        if isinstance(logger, logging.Logger)
+    )
+    handlers = {id(handler): handler for logger in loggers for handler in logger.handlers}
+    if logging.lastResort is not None:
+        handlers[id(logging.lastResort)] = logging.lastResort
+
+    for handler in handlers.values():
+        if not any(isinstance(item, PiiMaskFilter) for item in handler.filters):
+            handler.addFilter(PiiMaskFilter())
