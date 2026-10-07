@@ -186,8 +186,14 @@ def test_consent_config_timer_and_websocket_guard(
     completion = completed.json()
     assert completion["config_version"] == 1
     assert completion["seconds"] >= 0
-    assert wizard_client.get(completion["redirect_url"]).status_code == 200
-    assert wizard_client.get("/static/setup_test_call.js").status_code == 200
+    completion_page = wizard_client.get(completion["redirect_url"])
+    assert completion_page.status_code == 200
+    assert "голосовой обработчик ещё не подключён" not in completion_page.text
+    assert "Открыть симулятор звонка" in completion_page.text
+    test_call_script = wizard_client.get("/static/setup_test_call.js")
+    assert test_call_script.status_code == 200
+    assert 'window.location.assign("/call")' in test_call_script.text
+    assert "new WebSocket" not in test_call_script.text
 
     saved = wizard_client.get("/api/config")
     assert saved.status_code == 200

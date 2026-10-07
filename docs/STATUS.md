@@ -17,7 +17,8 @@ Last sync: Dev A (A2, A3, A4, router part of A6) and Dev B (B1–B7 editors) imp
   - `scripts/download_models.py`: Offline model downloader downloading faster-whisper and Silero VAD into `models/` for `make setup-voice`.
   - A4: `app/agent/llm_client.py` (`OllamaLLM` adapter using `SafeHttpClient` restricted to localhost), `prompts/nlu.ru.md` (Russian prompt for structured JSON extraction), `app/agent/nlu.py` (`understand_turn` with Ollama structured extraction and `rules_nlu` keyword fallback), and `app/agent/dialog.py` (`DialogSession` state machine, slot merging, re-ask limit <= 2, turn limit <= 8, polite closing).
   - A6 (partial): `app/agent/router.py` evaluating ordered `RoutingRule` priority (FR-05) and emergency handoff on `wants_human` / VIP (FR-06). `app/agent/summarizer.py` and `prompts/summary.ru.md` remain pending.
-- Current test suite: **121 passed** (`python -m pytest -q`), 1 upstream Starlette/httpx deprecation warning.
+- Current test suite: **120 passed, 7 skipped** (`python -m pytest -q`), 1 upstream Starlette/httpx deprecation warning (2026-10-07 test-call fix).
+- 2026-10-07 test-call fix: relative SQLite paths are resolved from the project root so starting from another working directory uses the same configured database; the setup-completion button now opens `/call` instead of opening and immediately closing a WebSocket probe. Added cwd-resolution and wizard UI regression tests. Full browser audio E2E remains untested.
 - `python -m compileall -q app tests`: passed.
 - `python -m ruff check app tests`: 33 lint errors reported workspace-wide; Ruff passes for Dev B modules. Five confirmed errors remain in Dev A's `app/agent/router.py` and `tests/test_agent.py`.
 - `make` remains unavailable in this Windows PowerShell environment; Python module commands (`python -m ...`) are used.

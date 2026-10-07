@@ -5,10 +5,10 @@
     <p class="eyebrow">Первый запуск</p>
     <h1>Настройка сохранена</h1>
     <p class="muted">Версия конфигурации: {{ config_version }}. Время настройки: {{ "%.2f"|format(seconds) }} сек.</p>
-    <div class="notice">Согласие сохранено. Проверка подтверждает, что согласие есть, но голосовой обработчик ещё не подключён.</div>
+    <div class="notice">Согласие сохранено. В симуляторе нажмите «Позвонить», затем «Тест S1», чтобы получить ответ ассистента.</div>
     <div class="wizard-actions complete-actions">
         <a class="button button-secondary" href="/calls">Перейти к звонкам</a>
-        <button id="test-call" class="button button-primary" type="button">Проверить тестовый звонок</button>
+        <button id="test-call" class="button button-primary" type="button">Открыть симулятор звонка</button>
     </div>
     <p id="test-call-status" class="muted" role="status" aria-live="polite"></p>
 </section>
