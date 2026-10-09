@@ -146,6 +146,55 @@ def test_failed_login_does_not_create_session(client: TestClient) -> None:
     assert client.get("/api/calls").status_code == 401
 
 
+def test_stats_and_audit_pages_are_authenticated_and_report_consistent_data(client: TestClient) -> None:
+    assert client.get("/stats", follow_redirects=False).status_code == 303
+    assert client.get("/api/stats").status_code == 401
+    login = client.post(
+        "/api/auth/login",
+        data={"username": "dashboard-owner", "password": "test-only-password"},
+        follow_redirects=False,
+    )
+    assert login.status_code == 303
+
+    stats = client.get("/api/stats")
+    assert stats.status_code == 200
+    assert stats.json()["calls"] == 5
+    assert stats.json()["handled"] == 2
+    assert stats.json()["unhandled"] == 3
+    assert stats.json()["estimated_minutes_saved"] == 10
+    assert client.get("/stats").status_code == 200
+
+    audit = client.get("/api/audit")
+    assert audit.status_code == 200
+    assert audit.json()["chain_valid"] is True
+    assert any(event["target"] == "stats" for event in audit.json()["events"])
+    audit_page = client.get("/audit")
+    assert audit_page.status_code == 200
+    assert "Цепочка проверена" in audit_page.text
+
+
+def test_delete_all_calls_preserves_audit_and_does_not_reseed_demo_calls(
+    client: TestClient,
+) -> None:
+    login = client.post(
+        "/api/auth/login",
+        data={"username": "dashboard-owner", "password": "test-only-password"},
+        follow_redirects=False,
+    )
+    assert login.status_code == 303
+
+    response = client.delete("/api/calls/all")
+
+    assert response.status_code == 200
+    assert response.json() == {"deleted_calls": 5}
+    with database.SessionLocal() as db_session:
+        assert db_session.scalar(select(CallRecord.id).limit(1)) is None
+        event = db_session.scalar(select(AuditEvent).where(AuditEvent.action == "delete"))
+        assert event is not None and event.details == {"deleted_count": 5}
+        key = client.app.state.settings.data_encryption_key.get_secret_value()
+        assert seed_demo_calls(db_session, key) == 0
+
+
 def test_demo_seed_is_idempotent_and_call_content_is_encrypted(client: TestClient) -> None:
     settings = client.app.state.settings
     key = settings.data_encryption_key.get_secret_value()

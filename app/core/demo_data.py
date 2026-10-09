@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import encrypt_text
-from app.models import CallRecord
+from app.models import AuditEvent, CallRecord
 
 _DEMO_CALLS: tuple[dict[str, Any], ...] = (
     {
@@ -105,8 +105,15 @@ _DEMO_CALLS: tuple[dict[str, Any], ...] = (
 
 
 def seed_demo_calls(db: Session, encryption_key: str) -> int:
-    """Seed five encrypted demo calls only when the call table is empty."""
-    if db.scalar(select(CallRecord.id).limit(1)) is not None:
+    """Seed demo calls only for a fresh database that has never explicitly purged calls."""
+    if db.scalar(select(CallRecord.id).limit(1)) is not None or db.scalar(
+        select(AuditEvent.id)
+        .where(
+            AuditEvent.target == "calls",
+            AuditEvent.action.in_(["delete", "retention_delete"]),
+        )
+        .limit(1)
+    ) is not None:
         return 0
 
     now = datetime.now(UTC)

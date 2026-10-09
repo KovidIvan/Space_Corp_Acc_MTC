@@ -150,6 +150,8 @@ if (form) {
 	form.elements.namedItem("greeting").value = config.greeting || "";
 	form.elements.namedItem("disclosure").value = config.disclosure || "";
 	form.elements.namedItem("closing").value = config.closing || "";
+	form.elements.namedItem("retention_days").value = config.retention_days ?? 30;
+	form.elements.namedItem("store_audio").checked = config.store_audio === true;
 	for (const item of config.faq || []) addFaqItem(item);
 	for (const rule of config.routing || []) addRoutingRule(rule);
 	for (const [index, hash] of (config.vip_numbers || []).entries()) addVipHash(hash, index);
@@ -211,6 +213,8 @@ if (form) {
 			greeting: form.elements.namedItem("greeting").value.trim(),
 			disclosure: form.elements.namedItem("disclosure").value.trim(),
 			closing: form.elements.namedItem("closing").value.trim(),
+			retention_days: Number(form.elements.namedItem("retention_days").value),
+			store_audio: form.elements.namedItem("store_audio").checked,
 			faq: Array.from(faqList.querySelectorAll(".faq-item"), (card) => ({
 				id: card.querySelector('[name="id"]').value.trim(),
 				question: card.querySelector('[name="question"]').value.trim(),
@@ -249,6 +253,26 @@ if (form) {
 			message.hidden = false;
 		} finally {
 			saveButton.disabled = false;
+		}
+	});
+	const deleteAllButton = document.getElementById("delete-all-calls");
+	const deleteAllMessage = document.getElementById("delete-all-message");
+	deleteAllButton.addEventListener("click", async () => {
+		if (!window.confirm("Удалить все звонки и связанные сообщения? Журнал аудита сохранится.")) return;
+		deleteAllButton.disabled = true;
+		deleteAllMessage.hidden = true;
+		try {
+			const response = await fetch("/api/calls/all", { method: "DELETE" });
+			const result = await response.json();
+			if (!response.ok) throw new Error("Удаление не выполнено.");
+			deleteAllMessage.textContent = `Удалено звонков: ${result.deleted_calls}. Журнал аудита сохранён.`;
+			deleteAllMessage.hidden = false;
+		} catch {
+			deleteAllMessage.textContent = "Не удалось удалить звонки. Обновите страницу и повторите попытку.";
+			deleteAllMessage.classList.add("notice-error");
+			deleteAllMessage.hidden = false;
+		} finally {
+			deleteAllButton.disabled = false;
 		}
 	});
 }

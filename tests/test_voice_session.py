@@ -160,6 +160,22 @@ def test_no_record_call_does_not_retain_or_ingest_transcript(
     assert result.slots == CallSlots(callback_number="+375291234567")
 
 
+def test_lazy_silero_failure_falls_back_to_energy_vad(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FailingSileroVAD:
+        def speech_probability(self, _pcm: bytes, _sample_rate: int) -> float:
+            raise RuntimeError("optional Silero dependencies are unavailable")
+
+    monkeypatch.setattr("app.voice.session.SileroVAD", FailingSileroVAD)
+    session = _make_session(FakeWebSocket(), _agent_config())
+    session._vad = None
+
+    session._init_adapters()
+
+    assert callable(session._vad)
+    assert session._vad(bytes(1024), 16000) == 0.0
+    assert session._vad(b"\x01\x00" * 512, 16000) == 0.8
+
+
 def test_opening_phrases_enforce_identity_and_disclosure() -> None:
     config = _agent_config()
     config.greeting = "Здравствуйте!"

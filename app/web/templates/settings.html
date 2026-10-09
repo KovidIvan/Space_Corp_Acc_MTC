@@ -71,12 +71,32 @@
                 </fieldset>
             </div>
         </section>
+        <section class="editor-section">
+            <p class="eyebrow">Хранение данных</p>
+            <h2>Срок хранения</h2>
+            <div class="form-stack">
+                <label for="retention-days">Хранить завершённые звонки, дней</label>
+                <input id="retention-days" name="retention_days" type="number" min="0" step="1" required>
+                <p class="muted">Очистка просроченных звонков выполняется при запуске и затем раз в сутки. Значение 0 удаляет все завершённые звонки.</p>
+                <label class="setting-toggle" for="store-audio">
+                    <input id="store-audio" name="store_audio" type="checkbox">
+                    Разрешить хранение аудио
+                </label>
+                <p class="muted">По умолчанию выключено. На данный момент приложение не сохраняет исходные аудиофайлы.</p>
+            </div>
+        </section>
         <div id="editor-message" class="notice" role="status" aria-live="polite" hidden></div>
         <div class="editor-actions">
             <span class="muted">Сохранение добавит запись в журнал аудита.</span>
             <button id="save-settings" class="button button-primary" type="submit">Сохранить изменения</button>
         </div>
     </form>
+</section>
+<section class="panel danger-panel">
+    <h2>Удаление данных звонков</h2>
+    <p class="muted">Удалит все записи звонков и связанный чат. Журнал аудита останется для сохранения истории действий.</p>
+    <button id="delete-all-calls" class="button button-danger" type="button">Удалить все звонки</button>
+    <div id="delete-all-message" class="notice" role="status" aria-live="polite" hidden></div>
 </section>
 <script id="editor-config" type="application/json">{{ config|tojson }}</script>
 <script src="/static/settings_editor.js" defer></script>

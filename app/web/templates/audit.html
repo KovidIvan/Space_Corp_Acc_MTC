@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Аудит{% endblock %}
+{% block content %}
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Журнал действий</p>
+        <h1>Аудит</h1>
+        <p class="muted">Показаны последние {{ audit_log.events|length }} событий. Частные данные звонков в журнал не включаются.</p>
+    </div>
+    {% if audit_log.chain_valid %}
+    <span class="badge audit-valid">Цепочка проверена</span>
+    {% else %}
+    <span class="badge audit-invalid">Нарушена целостность цепочки</span>
+    {% endif %}
+</section>
+<section class="panel table-panel" aria-label="Журнал аудита">
+    {% if audit_log.events %}
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Время UTC</th><th>Действие</th><th>Объект</th><th>Актор</th><th>Детали</th><th>Хэш</th></tr></thead>
+            <tbody>
+                {% for event in audit_log.events %}
+                <tr>
+                    <td>{{ event.ts }}</td>
+                    <td>{{ event.action }}</td>
+                    <td>{{ event.target }}</td>
+                    <td>{{ event.actor }}</td>
+                    <td><code>{{ event.details|tojson }}</code></td>
+                    <td><code>{{ event.hash[:12] }}</code></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state"><strong>Событий пока нет</strong><span>Просмотры и изменения появятся здесь.</span></div>
+    {% endif %}
+</section>
+{% endblock %}

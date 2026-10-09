@@ -7,7 +7,7 @@ from typing import Annotated, Any
 
 from cryptography.fernet import InvalidToken
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -16,7 +16,7 @@ from app.core.audit import record_audit_event
 from app.core.db import get_db
 from app.core.security import decrypt_text, encrypt_text
 from app.interfaces import Notice
-from app.models import CallRecord, Owner
+from app.models import CallRecord, ChatThread, Owner
 from app.schemas import CallEdit, CallResult
 
 router = APIRouter(prefix="/api/calls", tags=["calls"])
@@ -163,6 +163,20 @@ def list_calls(
         }
         for call in _call_query(db, urgency, intent, handled)
     ]
+
+
+@router.delete("/all")
+def delete_all_calls(
+    owner: Annotated[Owner, Depends(require_owner)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, int]:
+    """Delete all call records and related chat data while preserving the audit chain."""
+    deleted_count = db.scalar(select(func.count()).select_from(CallRecord)) or 0
+    db.execute(delete(ChatThread))
+    db.execute(delete(CallRecord))
+    record_audit_event(db, owner.id, "delete", "calls", {"deleted_count": deleted_count})
+    db.commit()
+    return {"deleted_calls": deleted_count}
 
 
 @router.get("/{call_id}")

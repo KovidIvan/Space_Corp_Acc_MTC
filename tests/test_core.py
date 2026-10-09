@@ -112,6 +112,22 @@ async def test_safe_http_client_does_not_follow_redirects_to_nonallowlisted_host
     assert requested_hosts == ["localhost"]
 
 
+@pytest.mark.asyncio
+async def test_offline_guard_blocks_nonallowlisted_host_before_transport() -> None:
+    requested_hosts: list[str] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        requested_hosts.append(request.url.host)
+        return httpx.Response(200, request=request)
+
+    safe_client = SafeHttpClient(httpx.AsyncClient(transport=httpx.MockTransport(respond)))
+    with pytest.raises(ValueError):
+        await safe_client.request("GET", "https://example.invalid/private")
+    await safe_client.aclose()
+
+    assert requested_hosts == []
+
+
 def test_fernet_text_round_trip_and_invalid_key() -> None:
     key = Fernet.generate_key()
     token = encrypt_text("синтетический текст", key)

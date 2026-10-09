@@ -116,16 +116,23 @@ def test_settings_editor_requires_login_and_loads_saved_scenario(wizard_client: 
         "start": "08:30",
         "end": "17:30",
     }
+    config["retention_days"] = 14
+    config["store_audio"] = True
     saved = wizard_client.put("/api/config", json=config)
     assert saved.status_code == 200
     assert saved.json()["faq"][0]["id"] == "synthetic-hours"
     assert saved.json()["routing"][0]["priority"] == 1
     assert saved.json()["working_hours"]["start"] == "08:30"
+    assert saved.json()["retention_days"] == 14
+    assert saved.json()["store_audio"] is True
     assert saved.json()["vip_numbers"] == config["vip_numbers"]
 
     editor = wizard_client.get("/settings")
     assert editor.status_code == 200
     assert "Synthetic hours?" in editor.text
+    assert 'id="retention-days"' in editor.text
+    assert 'id="store-audio"' in editor.text
+    assert 'id="delete-all-calls"' in editor.text
     assert "Уведомление об ИИ и обработке звонка" in editor.text
     assert "+375 (29) 123-45-67" not in editor.text
     assert wizard_client.get("/static/settings_editor.js").status_code == 200

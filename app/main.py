@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,17 +18,31 @@ from app.core.bootstrap import ensure_owner_account
 from app.core.config import Settings, settings
 from app.core.demo_data import seed_demo_calls
 from app.core.logging import install_pii_mask_filter
+from app.core.retention import delete_expired_calls
 
 WEB_DIR = Path(__file__).parent / "web"
 TEMPLATES_DIR = WEB_DIR / "templates"
 STATIC_DIR = WEB_DIR / "static"
 VOICE_CLIENT_DIR = Path(__file__).parent / "voice" / "client"
 
+
+def _run_retention_cleanup() -> None:
+    with database.SessionLocal() as db_session:
+        delete_expired_calls(db_session)
+
+
+async def _retention_worker() -> None:
+    while True:
+        await asyncio.to_thread(_run_retention_cleanup)
+        await asyncio.sleep(24 * 60 * 60)
+
+
 def create_app(runtime_settings: Settings = settings) -> FastAPI:
     """Create the dashboard application with local-only account bootstrap."""
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        retention_task: asyncio.Task[None] | None = None
         if runtime_settings.dashboard_configured:
             database.init_db()
             with database.SessionLocal() as db_session:
@@ -38,9 +53,16 @@ def create_app(runtime_settings: Settings = settings) -> FastAPI:
             telegram_channel = application.state.telegram_channel
             if telegram_channel is not None:
                 await telegram_channel.start()
+            retention_task = asyncio.create_task(_retention_worker())
         try:
             yield
         finally:
+            if retention_task is not None:
+                retention_task.cancel()
+                try:
+                    await retention_task
+                except asyncio.CancelledError:
+                    pass
             telegram_channel = application.state.telegram_channel
             if telegram_channel is not None and runtime_settings.dashboard_configured:
                 await telegram_channel.stop()

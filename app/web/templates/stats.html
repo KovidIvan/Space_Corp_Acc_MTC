@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Статистика{% endblock %}
+{% block content %}
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Сводка обращений</p>
+        <h1>Статистика</h1>
+        <p class="muted">Сводные данные рассчитаны по локальной базе звонков.</p>
+    </div>
+</section>
+<section class="summary-grid" aria-label="Основные показатели">
+    <article class="panel summary-card"><span>Всего звонков</span><strong>{{ stats.calls }}</strong></article>
+    <article class="panel summary-card"><span>Обработано</span><strong>{{ stats.handled }}</strong></article>
+    <article class="panel summary-card"><span>Не обработано</span><strong>{{ stats.unhandled }}</strong></article>
+    <article class="panel summary-card"><span>Оценка сэкономленного времени</span><strong>{{ stats.estimated_minutes_saved }} мин</strong><small>5 минут на каждый обработанный звонок</small></article>
+</section>
+<div class="stats-columns">
+    <section class="panel stats-panel">
+        <h2>По типу обращения</h2>
+        <ul class="stats-list">
+            {% for item in stats.by_intent %}
+            <li><span>{{ intent_labels.get(item.key, item.key) }}</span><strong>{{ item.count }}</strong></li>
+            {% else %}
+            <li class="muted">Пока нет данных</li>
+            {% endfor %}
+        </ul>
+    </section>
+    <section class="panel stats-panel">
+        <h2>По срочности</h2>
+        <ul class="stats-list">
+            {% for item in stats.by_urgency %}
+            <li><span>{{ urgency_labels.get(item.key, item.key) }}</span><strong>{{ item.count }}</strong></li>
+            {% else %}
+            <li class="muted">Пока нет данных</li>
+            {% endfor %}
+        </ul>
+    </section>
+</div>
+{% endblock %}

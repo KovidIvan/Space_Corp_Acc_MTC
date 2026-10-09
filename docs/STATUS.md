@@ -1,6 +1,6 @@
 # STATUS (update at the end of every work session)
 
-Last sync: Dev A (A2, A3, A4, router part of A6) and Dev B (B1–B7 editors) implemented and locally validated; B7 runtime acceptance is pending Dev A integration (2026-10-07). Approaching Sync Point S1.
+Last sync: Dev A (A2, A3, A4, router part of A6) and Dev B (B1–B8) implemented and locally validated; B7 runtime acceptance is pending Dev A integration. Approaching Sync Point S1.
 
 ## Current implementation snapshot
 - Dev B completed B1–B5:
@@ -11,26 +11,27 @@ Last sync: Dev A (A2, A3, A4, router part of A6) and Dev B (B1–B7 editors) imp
   - B5: Loopback-only `POST /api/calls/ingest`; CallResults are validated against schema, encrypted, and audited before B4 `Channel.notify()` is triggered. Duplicate call IDs are idempotent; `no_record` calls retain only encrypted callback numbers.
 - Dev B completed B6: authenticated call editing for transcript segments, summary, and classification; private fields remain encrypted, edited calls are marked, and edits are audited without copying private content into audit details. `no_record` calls cannot be edited.
 - Dev B completed B7 editors: authenticated `/settings` UI for scenario phrases, FAQ, routing conditions/actions/priorities, handoff number, VIP hashes, and working hours; saves use versioned AgentConfig and audit events. Runtime consumes most fields, but working-hours routing is still hard-coded to `outside_hours=False` in `CallSession` and is pending Dev A.
+- Dev B completed B8: authenticated `/stats` and `/api/stats`, `/audit` and `/api/audit`; daily retention cleanup uses `AgentConfig.retention_days`; settings expose retention and a default-off audio-storage preference; delete-all removes calls and chat data while retaining the audit chain; synthetic offline-guard test confirms blocked URLs never reach the HTTP transport. Audio capture/persistence itself is not implemented.
 - Dev A completed A2, A3, A4, download script, and A6 router:
   - A2: `app/voice/vad.py` (Silero VAD wrapper, `VADSegmenter` with 700 ms silence detection) and `app/voice/stt.py` (`FasterWhisperSTT` adapter using CTranslate2 int8 local model, returning word probabilities).
   - A3: `app/voice/tts.py` (`LocalTTS` adapter supporting Piper/Silero and silent PCM fallback) and `app/voice/phrases_cache.py` (`PhrasesCache` pre-rendering greeting, disclosure, and fixed phrases for zero initial latency).
   - `scripts/download_models.py`: Offline model downloader downloading faster-whisper and Silero VAD into `models/` for `make setup-voice`.
   - A4: `app/agent/llm_client.py` (`OllamaLLM` adapter using `SafeHttpClient` restricted to localhost), `prompts/nlu.ru.md` (Russian prompt for structured JSON extraction), `app/agent/nlu.py` (`understand_turn` with Ollama structured extraction and `rules_nlu` keyword fallback), and `app/agent/dialog.py` (`DialogSession` state machine, slot merging, re-ask limit <= 2, turn limit <= 8, polite closing).
   - A6 (partial): `app/agent/router.py` evaluating ordered `RoutingRule` priority (FR-05) and emergency handoff on `wants_human` / VIP (FR-06). `app/agent/summarizer.py` and `prompts/summary.ru.md` remain pending.
-- Current test suite: **126 passed, 7 skipped** (`python -m pytest -q`), 1 upstream Starlette/httpx deprecation warning (2026-10-07 logging and WebSocket diagnostics fix).
+- Current test suite: **130 passed, 7 skipped** (`python -m pytest -q`), 1 upstream Starlette/httpx deprecation warning.
 - 2026-10-07 test-call fix: relative SQLite paths are resolved from the project root so starting from another working directory uses the same configured database; the setup-completion button now opens `/call` instead of opening and immediately closing a WebSocket probe. Added cwd-resolution and wizard UI regression tests. Full browser audio E2E remains untested.
 - 2026-10-07 logging and call gate fix: the PII filter preserves Uvicorn access-log interpolation args while masking text fields; missing setup/consent/config now returns a WebSocket protocol error frame without starting a call; Telegram polling logs a safe error category and stops retrying persistent auth/access/conflict failures. No real Telegram request was made.
-- `python -m compileall -q app tests`: passed.
-- `python -m ruff check app tests`: passed workspace-wide on 2026-10-07.
+- `python -m compileall -q app tests`: passed after B8.
+- `python -m ruff check app tests`: passed workspace-wide after B8.
 - `make` remains unavailable in this Windows PowerShell environment; Python module commands (`python -m ...`) are used.
 
 ## Task board
 Dev A: [ ] A1 bench  [x] A2 VAD+STT  [x] A3 TTS+cache  [x] A4 NLU+dialog  [ ] A5 WS session+caller page  [ ] A6 router+handoff+summary (router done, summarizer pending)  [ ] A7 eval  [ ] A8 chat offer / extras
-Dev B: [x] B1 core+security  [x] B2 dashboard shell  [x] B3 wizard+config+consent  [x] B4 Telegram  [x] B5 ingest+notify  [x] B6 editing+audit  [x] B7 editors  [ ] B8 stats+settings+offline test
+Dev B: [x] B1 core+security  [x] B2 dashboard shell  [x] B3 wizard+config+consent  [x] B4 Telegram  [x] B5 ingest+notify  [x] B6 editing+audit  [x] B7 editors  [x] B8 stats+settings+offline test
 
 ## Requirements progress
 P0: FR-01 [ ] FR-02 [ ] FR-03 [ ] FR-04 [x] FR-05 [x] FR-06 [x] FR-07 [x] FR-08 [ ] FR-09 [ ] FR-10 [x] FR-11 [ ] FR-12 [x] FR-13 [x] FR-14 [x]
-P1: FR-15 [ ] FR-16 [ ] FR-17 [ ] FR-18 [ ] FR-19 [ ] FR-20 [x] FR-21 [ ]
+P1: FR-15 [ ] FR-16 [ ] FR-17 [ ] FR-18 [x] FR-19 [x] FR-20 [x] FR-21 [ ]
 P2: FR-22 [ ] FR-23 [ ] FR-24 [ ] FR-25 [ ] FR-26 [ ] FR-27 [ ]
 
 ## Chosen profile and measured numbers

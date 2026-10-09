@@ -140,11 +140,28 @@ class CallSession:
 
         if self._vad is None:
             try:
-                self._vad = SileroVAD()
-            except (ImportError, OSError, RuntimeError, ValueError):
-                logger.warning("Failed to initialize SileroVAD")
-                # Fallback simple energy probability function
+                silero_vad = SileroVAD()
+            except Exception:  # noqa: BLE001
+                logger.exception("Failed to initialize SileroVAD; using energy fallback")
                 self._vad = lambda pcm, sr: 0.8 if any(pcm) else 0.0
+            else:
+                # SileroVAD loads its optional model lazily, so constructor-only
+                # handling leaves missing voice dependencies to crash the call
+                # when the first microphone frame arrives. Switch to the local
+                # energy fallback if model loading/inference fails at that point.
+                silero_failed = False
+
+                def resilient_vad(pcm: bytes, sample_rate: int) -> float:
+                    nonlocal silero_failed
+                    if not silero_failed:
+                        try:
+                            return silero_vad.speech_probability(pcm, sample_rate)
+                        except Exception:  # noqa: BLE001
+                            logger.exception("SileroVAD failed; using energy fallback")
+                            silero_failed = True
+                    return 0.8 if any(pcm) else 0.0
+
+                self._vad = resilient_vad
 
         if self._llm is None:
             if self.settings.nlu_mode == "llm" and self.settings.llm_base_url:
@@ -172,7 +189,7 @@ class CallSession:
         except WebSocketDisconnect:
             logger.info("Call %s disconnected by client", self.call_id)
         except Exception:  # noqa: BLE001
-            logger.error("Error in call session %s", self.call_id)
+            logger.exception("Error in call session %s", self.call_id)
             try:
                 await self.websocket.send_text(
                     ServerError(code="internal", message="Внутренняя ошибка сервиса").model_dump_json()

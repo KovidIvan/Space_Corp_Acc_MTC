@@ -19,6 +19,8 @@
             {% if owner %}
             <nav class="main-nav" aria-label="Основная навигация">
                 <a href="/calls" {% if path.startswith('/calls') %}aria-current="page"{% endif %}>Звонки</a>
+                <a href="/stats" {% if path.startswith('/stats') %}aria-current="page"{% endif %}>Статистика</a>
+                <a href="/audit" {% if path.startswith('/audit') %}aria-current="page"{% endif %}>Аудит</a>
                 <a href="/settings" {% if path.startswith('/settings') %}aria-current="page"{% endif %}>Сценарий и правила</a>
                 <a href="/setup" {% if path.startswith('/setup') %}aria-current="page"{% endif %}>Настройка</a>
             </nav>

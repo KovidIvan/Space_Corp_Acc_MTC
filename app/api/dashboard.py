@@ -9,7 +9,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.audit import collect_audit_log
 from app.api.calls import _call_query
+from app.api.stats import collect_call_stats
 from app.core.audit import record_audit_event
 from app.core.db import get_db
 from app.core.security import decrypt_text
@@ -119,6 +121,26 @@ def calls_page(
     )
 
 
+@router.get("/audit", response_class=HTMLResponse, include_in_schema=False)
+def audit_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> Response:
+    """Render the recent audit log and verify the complete hash chain."""
+    owner = _owner_or_login(request, db)
+    if isinstance(owner, RedirectResponse):
+        return owner
+    record_audit_event(db, owner.id, "view", "audit")
+    db.flush()
+    audit_log = collect_audit_log(db)
+    db.commit()
+    return request.app.state.templates.TemplateResponse(
+        request=request,
+        name="audit.html",
+        context={"request": request, "owner": owner, "audit_log": audit_log},
+    )
+
+
 @router.get("/calls/rows", response_class=HTMLResponse, include_in_schema=False)
 def calls_rows(
     request: Request,
@@ -195,5 +217,30 @@ def settings_page(
             "owner": owner,
             "config": config.config_json,
             "config_version": config.version,
+        },
+    )
+
+
+@router.get("/stats", response_class=HTMLResponse, include_in_schema=False)
+def stats_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> Response:
+    """Render aggregate call statistics for the authenticated owner."""
+    owner = _owner_or_login(request, db)
+    if isinstance(owner, RedirectResponse):
+        return owner
+    stats = collect_call_stats(db)
+    record_audit_event(db, owner.id, "view", "stats")
+    db.commit()
+    return request.app.state.templates.TemplateResponse(
+        request=request,
+        name="stats.html",
+        context={
+            "request": request,
+            "owner": owner,
+            "stats": stats,
+            "intent_labels": INTENT_LABELS,
+            "urgency_labels": URGENCY_LABELS,
         },
     )

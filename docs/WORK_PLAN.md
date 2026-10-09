@@ -26,7 +26,7 @@ Rule of the plan: finish the core loop (call -> agent -> saved result -> Telegra
 | 0:00 to 2:00 | A6 router integration, handoff and wants_human, no_record mode, summarizer and slots | B6 call detail editing (segments, summary, classification) + audit entries; low-confidence highlighting |
 | 2:00 to 4:00 | A7 fixtures: 20 synthetic call scripts, `make eval` (WER, intent, urgency, slots, latency) -> docs/EVAL_REPORT.md | B7 scenario editor, routing rules editor, VIP, working hours, cache regeneration trigger |
 | S2 | Review all P0/P1 statuses against REQUIREMENTS; decide what is cut | same |
-| 4:00 to 6:00 | A8 offer_chat link flow with B; barge-in only if time; optional SIP spike (AudioSocket) in a separate branch | B8 stats page, settings (retention job, store-audio toggle, delete-all), audit page, offline guard test |
+| 4:00 to 6:00 | A8 offer_chat link flow with B; barge-in only if time; optional SIP spike (AudioSocket) in a separate branch | [x] B8 stats page, settings (retention job, store-audio toggle, delete-all), audit page, offline guard test |
 | S3 | Feature freeze. Rehearse demo twice. Record backup video of a full successful run | Deck: Ivan's journey (4 min) + scale and compliance (1 min); README; screenshots |
 | Last block | Fix-only. Final eval numbers into the deck. Tag the release | Video editing, submission package |
 
